@@ -53,6 +53,6 @@ for f in scene_before:live scene_black:frozen scene_banner:banner; do
         --banner-template "$F/tmpl_banner.png" --json | "$PY" -c 'import sys,json;d=json.load(sys.stdin);print("state=%s alive=%s sd=%s"%(d["state"],d["alive"],d["content_sd"]))'
 done
 echo "   Reconnect plan prefers the stable RustDesk channel over AnyDesk-free:"
-"$PY" "$DIR/lib/reconnect.py" plan --prefer rustdesk --rd-id 243540605 --json | j
+"$PY" "$DIR/lib/reconnect.py" plan --prefer rustdesk --rd-id 123456789 --json | j
 
 say "DONE — all offline. To act for real, the driver: RC_LIVE=1 bash rc.sh click-template <tmpl>"

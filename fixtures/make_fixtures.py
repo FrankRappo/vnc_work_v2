@@ -57,7 +57,7 @@ def _base_desktop():
     # a window title + some UI so template matching has real structure.
     cv2.rectangle(img, (200, 120), (1080, 700), (60, 63, 70), -1)
     cv2.rectangle(img, (200, 120), (1080, 160), (90, 94, 104), -1)
-    cv2.putText(img, "KSO :: EasySet terminal", (220, 148),
+    cv2.putText(img, "Demo :: terminal", (220, 148),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (230, 230, 235), 2, cv2.LINE_AA)
     cv2.putText(img, "Total: 1 240.00", (240, 300),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0, (220, 220, 225), 2, cv2.LINE_AA)

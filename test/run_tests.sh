@@ -30,7 +30,7 @@ echo "$OUT"
 echo "$OUT" | grep -q "DRY-RUN" || { echo "SAFETY FAIL: click did not dry-run!"; fail=1; }
 
 echo "-- reconnect plan dry-run --"
-OUT=$(RC_PREFER=rustdesk RC_RD_ID=243540605 bash "$DIR/rc.sh" reconnect 2>&1)
+OUT=$(RC_PREFER=rustdesk RC_RD_ID=123456789 bash "$DIR/rc.sh" reconnect 2>&1)
 echo "$OUT"
 echo "$OUT" | grep -q "dry-run" || { echo "SAFETY FAIL: reconnect not dry-run!"; fail=1; }
 echo "$OUT" | grep -q "rustdesk" || { echo "reconnect plan missing rustdesk"; fail=1; }
