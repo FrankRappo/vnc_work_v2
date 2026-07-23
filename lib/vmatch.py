@@ -55,6 +55,65 @@ def _imread(path, gray=True):
     return img
 
 
+def _preprocess(img, use_clahe=True):
+    """Normalize image for better matching. Uses CLAHE to handle lighting shifts."""
+    if len(img.shape) == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    if use_clahe:
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        img = clahe.apply(img)
+    return img
+
+
+def _match_orb(scene, templ):
+    """
+    Fallback match using ORB features. 
+    Useful for noisy images or when template matching fails.
+    Returns (score, cx, cy, left, top, w, h) or None.
+    """
+    orb = cv2.ORB_create(nfeatures=500)
+    kp1, des1 = orb.detectAndCompute(templ, None)
+    kp2, des2 = orb.detectAndCompute(scene, None)
+    
+    if des1 is None or des2 is None:
+        return None
+    
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+    matches = bf.knnMatch(des1, des2, k=2)
+    
+    # Lowe's ratio test
+    good = []
+    for m, n in matches:
+        if m.distance < 0.75 * n.distance:
+            good.append(m)
+            
+    if len(good) < 4: # Need at least 4 points for homography
+        return None
+        
+    src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+    dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+    
+    M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+    if M is None:
+        return None
+        
+    h, w = templ.shape
+    pts = np.float32([[0, 0], [0, h-1], [w-1, h-1], [w-1, 0]]).reshape(-1, 1, 2)
+    dst = cv2.perspectiveTransform(pts, M)
+    
+    # Calculate bounding box
+    min_x = np.min(dst[:, 0, 0])
+    max_x = np.max(dst[:, 0, 0])
+    min_y = np.min(dst[:, 0, 1])
+    max_y = np.max(dst[:, 0, 1])
+    
+    # Confidence based on ratio of inliers
+    score = len(good) / max(len(kp1), 1) # Rough confidence
+    
+    return (score, (min_x + max_x)/2, (min_y + max_y)/2, min_x, min_y, max_x-min_x, max_y-min_y)
+
+
 def _parse_floats(s):
     return [float(x) for x in s.split(",") if x.strip() != ""]
 
@@ -77,17 +136,16 @@ def _match_one(scene, templ, method=cv2.TM_CCOEFF_NORMED):
 def find(scene_path, templ_path, min_score=0.80, scales=None, offset=(0, 0),
          use_edges=False):
     """
-    Multi-scale template match. Returns a dict describing the best hit.
-
-    Robustness knobs:
-      * multi-scale — the remote frame may be up/down-scaled (RustDesk upscales
-        the :99 frame; AnyDesk fits-to-window), so we try several template scales
-        and keep the best-scoring one.
-      * --edges — match on Canny edges instead of raw grayscale, which survives
-        brightness/theme shifts (kiosk day/night, JPEG recompression).
+    Multi-scale template match with a fallback to ORB feature matching.
+    Returns a dict describing the best hit.
     """
-    scene = _imread(scene_path, gray=True)
-    templ = _imread(templ_path, gray=True)
+    # Load and preprocess images
+    scene_raw = _imread(scene_path, gray=False)
+    templ_raw = _imread(templ_path, gray=False)
+    
+    scene_norm = _preprocess(scene_raw)
+    templ_norm = _preprocess(templ_raw)
+
     if scales is None:
         scales = [1.0, 0.9, 0.8, 1.1, 1.25, 0.67, 1.5]
 
@@ -96,15 +154,17 @@ def find(scene_path, templ_path, min_score=0.80, scales=None, offset=(0, 0),
             return img
         return cv2.Canny(img, 60, 180)
 
-    scene_p = prep(scene)
+    scene_p = prep(scene_norm)
     best = None  # (score, cx, cy, left, top, w, h, scale)
+    
+    # Stage 1: Template Matching (fast, precise)
     for sc in scales:
         if sc <= 0:
             continue
         if abs(sc - 1.0) < 1e-9:
-            t = templ
+            t = templ_norm
         else:
-            t = cv2.resize(templ, None, fx=sc, fy=sc,
+            t = cv2.resize(templ_norm, None, fx=sc, fy=sc,
                            interpolation=cv2.INTER_AREA if sc < 1 else cv2.INTER_LINEAR)
         tt = prep(t) if use_edges else t
         r = _match_one(scene_p, tt)
@@ -117,16 +177,28 @@ def find(scene_path, templ_path, min_score=0.80, scales=None, offset=(0, 0),
         if best is None or score > best[0]:
             best = cand
 
+    # Stage 2: ORB Fallback (robust to noise/distortion)
+    if best is None or best[0] < min_score:
+        orb_res = _match_orb(scene_norm, templ_norm)
+        if orb_res:
+            score, cx, cy, left, top, w, h = orb_res
+            # Map ORB result to the same format as template match
+            # We use a fixed scale of 1.0 for the ORB result as it is scale-invariant
+            cx += offset[0]
+            cy += offset[1]
+            if best is None or score > best[0]:
+                best = (score, cx, cy, left, top, w, h, 1.0)
+
     if best is None:
-        return {"found": False, "score": 0.0, "reason": "template larger than scene at all scales"}
+        return {"found": False, "score": 0.0, "reason": "no match found via template or ORB"}
 
     score, cx, cy, left, top, w, h, sc = best
     return {
         "found": bool(score >= min_score),
         "score": round(score, 4),
         "min_score": min_score,
-        "x": cx, "y": cy,               # click point (scene coords + offset)
-        "left": left, "top": top,        # bounding box top-left (raw match)
+        "x": cx, "y": cy,
+        "left": left, "top": top,
         "w": w, "h": h,
         "scale": sc,
         "offset": list(offset),
