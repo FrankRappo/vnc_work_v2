@@ -81,6 +81,7 @@ commands:
   verify <before> <after> <x,y,w,h>    did the target region change? (exit 0=yes)
   calibrate <anchor> [expectX,Y]       measure toolbar offset -> screens/.offset
   classify [frame]                     session liveness: live | black | banner
+  livecheck                            frozen-frame detector (viewer error dialog present?)
   reconnect [--run]                    print (or --run under RC_LIVE) the reconnect plan
   selftest                             run the offline fixture test
 
@@ -186,6 +187,26 @@ case "${1:-}" in
 d=json.load(sys.stdin)
 print("%d,%d"%tuple(d["offset"])) if d.get("ok") else print("")' )
     [ -n "$OFF" ] && { echo "$OFF" > "$OFFSET_FILE"; echo "saved offset $OFF -> $OFFSET_FILE"; }
+    ;;
+
+  livecheck)
+    # Is the viewer showing the REAL remote screen right now, or a FROZEN last frame?
+    # classify() only measures picture content -- a dead session leaves the last frame on :99 and
+    # still scores "live". The give-away is the viewer's own modal: alongside the session window
+    # ("<id>@<host> - Remote Desktop - RustDesk") a bare "RustDesk" dialog appears on disconnect.
+    wins="$(DISPLAY="$RC_DISPLAY" xdotool search --name "." getwindowname %@ 2>/dev/null)"
+    sess=0; dlg=0
+    while IFS= read -r w; do
+      case "$w" in
+        *"Remote Desktop - RustDesk") sess=1 ;;
+        "RustDesk") dlg=$((dlg+1)) ;;
+      esac
+    done <<< "$wins"
+    printf '{"session_window":%s,"viewer_dialog":%s,"stale":%s}\n' \
+      "$([ "$sess" = 1 ] && echo true || echo false)" \
+      "$dlg" \
+      "$([ "$dlg" -gt 0 ] && echo true || echo false)"
+    [ "$dlg" -gt 0 ] && exit 1 || exit 0
     ;;
 
   classify)
