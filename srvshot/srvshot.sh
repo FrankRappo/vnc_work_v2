@@ -13,11 +13,13 @@ SSH="${SSH:-/work/vnc_work/ofd_ssh.sh}"
 SCP="${SCP:-/work/vnc_work/ofd_scp.sh}"
 RHOST="${RHOST:-ofd}"
 RDIR="${RDIR:-C:/Users/User}"
-OUT="${1:?usage: srvshot.sh <local-out.png>}"
+OUT="${1:?usage: srvshot.sh <local-out.png> [focus-title-substring] [settle-sec]}"
+FOCUS="${2:-}"
+SETTLE="${3:-3}"
 WIN_PNG="${RDIR//\//\\}\\srvshot.png"
 
 bash "$SCP" "$DIR/shot_inner.ps1" "$RHOST:$RDIR/srvshot_inner.ps1" >/dev/null 2>&1 || { echo "SCP_FAIL inner"; exit 1; }
 bash "$SCP" "$DIR/shot_run.ps1"   "$RHOST:$RDIR/srvshot_run.ps1"   >/dev/null 2>&1 || { echo "SCP_FAIL run"; exit 1; }
-bash "$SSH" "powershell -NoProfile -ExecutionPolicy Bypass -File ${RDIR//\//\\}\\srvshot_run.ps1 -Png $WIN_PNG -Inner ${RDIR//\//\\}\\srvshot_inner.ps1" 2>&1 | grep -E "^SHOT=" 
+bash "$SSH" "powershell -NoProfile -ExecutionPolicy Bypass -File ${RDIR//\//\\}\\srvshot_run.ps1 -Png $WIN_PNG -Inner ${RDIR//\//\\}\\srvshot_inner.ps1 -FocusTitle \"$FOCUS\" -SettleSec $SETTLE" 2>&1 | grep -E "^SHOT=|^WIN " | head -20
 bash "$SCP" "$RHOST:$RDIR/srvshot.png" "$OUT" >/dev/null 2>&1 || { echo "SCP_FAIL pull"; exit 1; }
 echo "LOCAL=$OUT BYTES=$(wc -c < "$OUT")"
