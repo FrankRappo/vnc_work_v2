@@ -20,6 +20,7 @@
 ## Состав
 
 ```
+cdp_up.sh         залить cdp_start.ps1 на удалённую машину и поднять браузер (идемпотентно)
 cdp_start.ps1     поднять headless Chrome с --remote-debugging-port (изолированный профиль,
                   запуск через schtasks — OpenSSH убивает детей своей сессии)
 cdp_get.ps1       Page.navigate + Runtime.evaluate -> текст в файл (на удалённой машине)
@@ -33,8 +34,8 @@ js/               готовые выражения: links, form_dump, results_r
 ## Быстрый старт
 
 ```bash
-# 1) поднять браузер на удалённой машине (идемпотентно)
-bash /work/vnc_work/ofd_ssh.sh 'powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\User\cdp_start.ps1'
+# 1) поднять браузер на удалённой машине (идемпотентно: зальёт скрипт и запустит)
+bash cdp_up.sh
 
 # 2) страница -> текст (весь DOM)
 bash cdpq.sh https://fs.atol.ru/ /tmp/page.html 10000
