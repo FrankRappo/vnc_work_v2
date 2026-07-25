@@ -23,13 +23,46 @@
 cdp_up.sh         залить cdp_start.ps1 на удалённую машину и поднять браузер (идемпотентно)
 cdp_start.ps1     поднять headless Chrome с --remote-debugging-port (изолированный профиль,
                   запуск через schtasks — OpenSSH убивает детей своей сессии)
-cdp_get.ps1       Page.navigate + Runtime.evaluate -> текст в файл (на удалённой машине)
+cdp_get.ps1       Page.navigate + Runtime.evaluate -> текст в файл (на удалённой машине);
+                  доверенный клик (Input.dispatchMouseEvent), ожидание предиката, iframe-контекст
 cdpq.sh           локальная обёртка: залить скрипт/JS, выполнить по SSH, забрать результат
+cdp_net.ps1       запись СЕТИ страницы (Network domain): запросы + тела ответов -> текст в файл
+cdpnet.sh         локальная обёртка к cdp_net.ps1
 mk_setselect.py   генератор JS: выбрать <option> в ASP.NET-дропдауне и вызвать postback
 mk_textsearch.py  генератор JS: вбить фразу в поиск и отправить форму
 mk_zipindex.py    генератор JS: прочитать оглавление УДАЛЁННОГО .zip через HTTP Range (без скачивания)
-js/               готовые выражения: links, form_dump, results_rows, reset, cookies, ua, …
+js/               готовые выражения: links, form_dump, results_rows, grid_rows, cookies, ua, …
 ```
+
+## Вождение UI: доверенный клик, ожидание, iframe (T71)
+
+```bash
+# ДОВЕРЕННЫЙ клик по координатам вьюпорта (не синтетический el.click())
+CDP_NONAV=1 CDP_CLICK="1038,231" bash cdpq.sh - /tmp/o.txt 4000 js/pagetext.js
+CDP_CLICKS=2 …            # двойной клик (две пары press/release: 1, затем 2)
+CDP_BTN=right …           # правая кнопка (контекстное меню)
+
+# ЖДАТЬ появления, а не гадать паузой: предикат опрашивается до истины, печатает WAIT=OK|TIMEOUT
+CDP_NONAV=1 CDP_WAIT='document.querySelectorAll("iframe").length>0' CDP_WAITMS=25000 \
+  bash cdpq.sh - /tmp/o.txt 1000 js/pagetext.js
+
+# выполнить выражение ВНУТРИ iframe (его СОБСТВЕННЫЙ main world -> видны переменные страницы)
+CDP_NONAV=1 CDP_FRAME="fd_00085414" bash cdpq.sh - /tmp/o.txt 1500 ./my_frame_expr.js
+```
+
+## Сеть страницы: брать данные из ответа сервера, а не из DOM
+
+```bash
+CDP_CLICK="76,123" bash cdpnet.sh /tmp/net.txt 12            # клик -> что он дёрнул (с телами)
+bash cdpnet.sh /tmp/net.txt 15 uidl                          # только URL с подстрокой uidl
+CDP_NAV="https://lk.example/x" CDP_MAXBODY=400000 bash cdpnet.sh /tmp/net.txt 20 api
+CDP_NOBODY=1 bash cdpnet.sh /tmp/index.txt 20                # индекс запросов без тел
+```
+
+Зачем: в кабинетах (Vaadin/SPA) значения в DOM уже отформатированы и разложены по свёрнутым
+блокам, а в JSON-ответе они лежат сырыми. Плюс видно, ЧТО сервер ответил на клик: пустой UIDL
+(`for(;;);[{"syncId":..}]` без `execute`) — доказательство, что «кнопка нажалась, но делать
+нечего», а не что клик не дошёл.
 
 ## Быстрый старт
 
@@ -82,3 +115,18 @@ CDP_NONAV=1 bash cdpq.sh - /tmp/ua.txt 2500 js/ua.js              # его же 
    ни `Copy-Item`, ни `FileShare::ReadWrite`, ни `esentutl /y`), и лезть в него незачем.
 7. **`schtasks` предупреждает про `/ST` в прошлом** — это не ошибка, задача всё равно
    запускается через `schtasks /run`.
+8. **Компонентные гриды не верят синтетическому клику.** `el.click()` хватает обычной кнопке
+   (и вкладке Vaadin), но строка `vaadin-grid` на него не реагирует: контент ячеек лежит в
+   СВЕТЛОМ DOM (`vaadin-grid-cell-content`), а `<td>` в shadow DOM держит только `<slot>`.
+   Рабочий путь — `CDP_CLICK="x,y"` (`Input.dispatchMouseEvent`), координаты брать у
+   `getBoundingClientRect()` нужной ячейки.
+9. **Двойной клик = ДВЕ пары press/release с `clickCount` 1, затем 2.** Одно событие с
+   `clickCount:2` `dblclick` в Chrome НЕ порождает. Карточка, открывающаяся по двойному клику
+   (так устроен ЛК ОФД-Я), при этом молчит — и вывод «клик не доходит» будет ложным.
+10. **Модалка может быть `<iframe>` — и `innerText` страницы её НЕ покажет.** Признак «ничего
+    не открылось» по тексту страницы недостоверен: проверяй `document.querySelectorAll('iframe')`
+    (или дампи `outerHTML` и грепай). Содержимое читать `-Frame <подстрока URL>` (main world
+    фрейма, видны его JS-переменные) либо `fetch(src)` из top-фрейма, если тот же origin.
+11. **Фиксированный `-SettleMs` — ставка.** Проиграв её, читаешь страницу ДО прихода данных.
+    `CDP_WAIT='<предикат>'` опрашивает до истины и печатает `WAIT=OK|TIMEOUT`, так что промах
+    виден, а не превращается в неверный вывод.

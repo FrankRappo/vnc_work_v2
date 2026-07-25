@@ -47,7 +47,26 @@ WIN_DRV="${RDIR//\//\\}\\cdp_get.ps1"
 URL_ARG="-Url \"$URL\""
 NAV_ARG=""
 if [ "$NONAV" = "1" ]; then URL_ARG=""; NAV_ARG="-NoNav"; fi
-bash "$SSH" "powershell -NoProfile -ExecutionPolicy Bypass -File $WIN_DRV $URL_ARG -Out \"$WIN_OUT\" -Port $PORT -SettleMs $SETTLE $EXPR_ARG $NAV_ARG" 2>&1 | tail -3
+
+# CDP_CLICK="x,y" -> TRUSTED click at viewport coords before the settle wait (CDP_BTN=left|right,
+# CDP_CLICKS=2 for double-click). Needed where synthetic el.click() is ignored (Vaadin grid rows).
+CLICK_ARG=""
+if [ -n "${CDP_CLICK:-}" ]; then
+  CLICK_ARG="-Click \"$CDP_CLICK\" -ClickBtn ${CDP_BTN:-left} -ClickCount ${CDP_CLICKS:-1}"
+fi
+
+# CDP_WAIT='<js predicate>' -> poll until truthy (CDP_WAITMS, default 20000) instead of trusting
+# the fixed settle. Prints WAIT=OK / WAIT=TIMEOUT, so a slow dialog never reads as "nothing happened".
+WAIT_ARG=""
+if [ -n "${CDP_WAIT:-}" ]; then
+  WAIT_ARG="-WaitFor \"${CDP_WAIT//\"/\\\"}\" -WaitMs ${CDP_WAITMS:-20000}"
+fi
+
+# CDP_FRAME='<substring of the iframe URL>' -> evaluate inside that frame's own context.
+FRAME_ARG=""
+[ -n "${CDP_FRAME:-}" ] && FRAME_ARG="-Frame \"$CDP_FRAME\""
+
+bash "$SSH" "powershell -NoProfile -ExecutionPolicy Bypass -File $WIN_DRV $URL_ARG -Out \"$WIN_OUT\" -Port $PORT -SettleMs $SETTLE $EXPR_ARG $NAV_ARG $CLICK_ARG $WAIT_ARG $FRAME_ARG" 2>&1 | tail -5
 
 bash "$SCP" "$RHOST:$REMOTE_OUT" "$OUT" >/dev/null 2>&1 || { echo "SCP_FAIL pull"; exit 1; }
 bash "$SSH" "cmd /c del \"$WIN_OUT\"" >/dev/null 2>&1
