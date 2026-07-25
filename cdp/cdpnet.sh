@@ -36,7 +36,11 @@ EXTRA=""
 [ -n "$FILTER"        ] && EXTRA="$EXTRA -UrlFilter \"$FILTER\""
 [ -z "${CDP_NOBODY:-}" ] && EXTRA="$EXTRA -Bodies"
 [ -n "${CDP_MAXBODY:-}" ] && EXTRA="$EXTRA -MaxBody ${CDP_MAXBODY}"
-if [ -n "${CDP_JS:-}" ]; then
+# CDP_REMOTE_JS=<windows path>: expression file already ON the box (never uploaded, never deleted).
+# Use it when the expression carries a secret that must not enter the orchestrator's context.
+if [ -n "${CDP_REMOTE_JS:-}" ]; then
+  EXTRA="$EXTRA -ExprFile ${CDP_REMOTE_JS}"
+elif [ -n "${CDP_JS:-}" ]; then
   bash "$SCP" "$CDP_JS" "$RHOST:$RDIR/t71_$TAG.js" >/dev/null 2>&1 || { echo "SCP_FAIL js"; exit 1; }
   EXTRA="$EXTRA -ExprFile ${RDIR//\//\\}\\t71_$TAG.js"
 fi

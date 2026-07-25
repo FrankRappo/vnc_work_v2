@@ -34,7 +34,14 @@ EXPR_ARG=""
 # ship the driver scripts (idempotent, cheap)
 bash "$SCP" "$DIR/cdp_get.ps1" "$RHOST:$RDIR/cdp_get.ps1" >/dev/null 2>&1 || { echo "SCP_FAIL driver"; exit 1; }
 
-if [ -n "$JSFILE" ]; then
+# CDP_REMOTE_JS=<windows path> -> use an expression file that ALREADY sits on the remote box, and
+# do not upload/delete anything. Needed when the expression must contain a secret (an auth token,
+# a code) that must never pass through the orchestrator's context: generate the file on the box
+# (e.g. with rps.sh reading a token file) and only name it here.
+if [ -n "${CDP_REMOTE_JS:-}" ]; then
+  EXPR_ARG="-ExprFile ${CDP_REMOTE_JS}"
+  JSFILE=""
+elif [ -n "$JSFILE" ]; then
   bash "$SCP" "$JSFILE" "$RHOST:$RDIR/t67_$TAG.js" >/dev/null 2>&1 || { echo "SCP_FAIL js"; exit 1; }
   EXPR_ARG="-ExprFile ${RDIR//\//\\}\\t67_$TAG.js"
 fi
