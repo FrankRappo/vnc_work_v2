@@ -197,9 +197,31 @@ def cmd_ocr(a):
                 "hint": "install tesseract-ocr, or use template match (vmatch.py find)"}, 5
     img = _imread(a.scene)
     tmp = a.scene + ".ocr"
+    # --region X,Y,W,H + --scale: CROP AND UPSCALE BEFORE OCR.
+    # Small UI text (1C section panel, form field captions at 1920x1080) is not read at all
+    # on the full frame: tesseract returned zero hits for nine visible section names, i.e. a
+    # negative OCR result on a full frame proves nothing. The same frame cropped to the column
+    # and scaled 3x reads every one of them at conf 91-97. Coordinates are mapped back to real
+    # screen pixels here, so callers keep working in screen space.
+    scan = a.scene
+    ox = oy = 0
+    scale = float(getattr(a, "scale", 1.0) or 1.0)
+    region = getattr(a, "region", None)
+    if region or scale != 1.0:
+        sub = img
+        if region:
+            ox, oy, rw, rh = region
+            H, W = img.shape[:2]
+            ox = max(0, min(ox, W - 1)); oy = max(0, min(oy, H - 1))
+            rw = max(1, min(rw, W - ox)); rh = max(1, min(rh, H - oy))
+            sub = img[oy:oy + rh, ox:ox + rw]
+        if scale != 1.0:
+            sub = cv2.resize(sub, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
+        scan = a.scene + ".ocrscan.png"
+        cv2.imwrite(scan, sub)
     try:
         proc = subprocess.run(
-            [exe, a.scene, tmp, "-l", a.lang, "tsv"],
+            [exe, scan, tmp, "-l", a.lang, "tsv"],
             capture_output=True, text=True, timeout=60)
         tsv_path = tmp + ".tsv"
         if proc.returncode != 0 or not os.path.exists(tsv_path):
@@ -224,18 +246,26 @@ def cmd_ocr(a):
                 if want in txt.lower() and conf >= a.min_conf:
                     L, T = int(f[idx["left"]]), int(f[idx["top"]])
                     Wd, Hd = int(f[idx["width"]]), int(f[idx["height"]])
-                    cand = (conf, L + Wd // 2, T + Hd // 2, txt)
+                    cand = (conf,
+                            int(round(ox + (L + Wd / 2.0) / scale)),
+                            int(round(oy + (T + Hd / 2.0) / scale)),
+                            txt,
+                            int(round(ox + L / scale)), int(round(oy + T / scale)),
+                            int(round(Wd / scale)), int(round(Hd / scale)))
                     if best is None or conf > best[0]:
                         best = cand
         if best is None:
             return {"found": False, "reason": "text not found", "text": a.text}, 2
-        conf, cx, cy, txt = best
-        return {"found": True, "x": cx, "y": cy, "conf": conf, "matched": txt}, 0
+        conf, cx, cy, txt, bx, by, bw, bh = best
+        return {"found": True, "x": cx, "y": cy, "conf": conf, "matched": txt,
+                "box": "%d,%d,%d,%d" % (bx, by, bw, bh)}, 0
     finally:
         for ext in (".tsv", ".txt"):
-            p = tmp + ext
-            if os.path.exists(p):
-                os.remove(p)
+            q = tmp + ext
+            if os.path.exists(q):
+                os.remove(q)
+        if scan != a.scene and os.path.exists(scan):
+            os.remove(scan)
 
 
 def _emit(obj, as_json):
@@ -270,6 +300,8 @@ def main(argv=None):
     o = sub.add_parser("ocr"); o.add_argument("--scene", required=True)
     o.add_argument("--text", required=True); o.add_argument("--lang", default="rus+eng")
     o.add_argument("--min-conf", type=float, default=40.0); o.add_argument("--json", action="store_true")
+    o.add_argument("--region", default=None, help="X,Y,W,H crop before OCR (coords mapped back)")
+    o.add_argument("--scale", type=float, default=1.0, help="upscale factor before OCR (3.0 for small UI text)")
 
     a = p.parse_args(argv)
     try:
@@ -290,7 +322,9 @@ def main(argv=None):
                 sys.stderr.write("roi: need --center X,Y or --box X,Y,W,H\n"); return 3
             res, rc = cmd_roi(a)
         elif a.cmd == "ocr":
-            a.min_conf = a.min_conf
+            a.region = _ints(a.region) if a.region else None
+            if a.region and len(a.region) != 4:
+                sys.stderr.write("ocr: --region needs X,Y,W,H\n"); return 3
             res, rc = cmd_ocr(a)
         else:
             return 3

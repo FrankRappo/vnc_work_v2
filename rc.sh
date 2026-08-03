@@ -122,8 +122,16 @@ case "${1:-}" in
     ;;
 
   ocr)
+    # ocr <text> [scene] [region X,Y,W,H] [scale]
+    # 🔴 Region+scale matter: on a full 1920x1080 frame tesseract reads none of the small UI
+    # captions, so a "not found" there is not evidence of absence. Crop to the area and scale 3x.
     TX="${2:?need text}"; S="${3:-$(_last_scene)}"; [ -n "$S" ] || die "no scene"
-    "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --json
+    RG="${4:-}"; SC="${5:-1.0}"
+    if [ -n "$RG" ]; then
+      "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --region "$RG" --scale "$SC" --json
+    else
+      "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --scale "$SC" --json
+    fi
     ;;
 
   click)
