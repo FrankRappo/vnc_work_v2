@@ -51,13 +51,22 @@ X(){
 # Capture one frame to $1. Pluggable via RC_SHOT_CMD (runtime-discovered capture
 # backend: scrot here, but could be a scheduled-task pull like shot1.sh, or — in
 # offline tests — a fixture copier). RC_SHOT_DEST is exported for the custom cmd.
+#
+# 🔴 A frame must NEVER be inherited from an earlier run (kso-anydesk-stale-frame,
+# 2026-08-05): the previous version left the old $dest (and its .jpg sibling) in
+# place when capture failed, so the next reader picked up a week-old picture and
+# reasoned about it as if it were now. We therefore delete both artefacts BEFORE
+# capturing and treat "capture returned 0 but wrote nothing" as a failure too.
 _shot_to(){
-  local dest="$1"
+  local dest="$1" jpg="${1%.png}.jpg"
+  rm -f "$dest" "$jpg" 2>/dev/null
   if [ -n "${RC_SHOT_CMD:-}" ]; then
-    RC_SHOT_DEST="$dest" bash -c "$RC_SHOT_CMD"
+    RC_SHOT_DEST="$dest" bash -c "$RC_SHOT_CMD" || { log "SHOT_FAIL: RC_SHOT_CMD failed -> $dest"; return 1; }
   else
-    X scrot -o "$dest" 2>/dev/null
+    X scrot -o "$dest" 2>/dev/null || { log "SHOT_FAIL: scrot got nothing from DISPLAY=$DISPLAY_ -> $dest (is the display up?)"; return 1; }
   fi
+  [ -s "$dest" ] || { log "SHOT_FAIL: capture returned 0 but $dest is empty/missing"; rm -f "$dest"; return 1; }
+  return 0
 }
 
 _read_offset(){ [ -r "$OFFSET_FILE" ] && cat "$OFFSET_FILE" || echo "0,0"; }
@@ -65,12 +74,43 @@ _read_offset(){ [ -r "$OFFSET_FILE" ] && cat "$OFFSET_FILE" || echo "0,0"; }
 # scene defaults to the most recent shot if not given
 _last_scene(){ ls -t "$SCREENS"/*.png 2>/dev/null | head -1; }
 
+# 🔴 Guard against reasoning over a stale frame. `ls -t | head -1` is exactly the
+# trap that cost us a wrong conclusion on 2026-08-05: when a shot fails, the newest
+# .png in the directory is some frame from days ago and every downstream command
+# (crop/grid/find/ocr/classify) happily analyses it and returns a clean JSON.
+# An IMPLICITLY chosen scene is age-checked; a scene named on the command line is
+# trusted (the caller meant that file) but its age is still reported.
+# RC_SCENE_MAX_MIN=0 disables the hard check.
+SCENE_MAX_MIN="${RC_SCENE_MAX_MIN:-30}"
+_scene_age_min(){ echo $(( ( $(date +%s) - $(stat -c %Y "$1" 2>/dev/null || echo 0) ) / 60 )); }
+# _scene_guard <path> <implicit|explicit>
+_scene_guard(){
+  local s="$1" how="${2:-implicit}" age; age="$(_scene_age_min "$s")"
+  log "scene: $s (снят $(date -d "@$(stat -c %Y "$s" 2>/dev/null || echo 0)" '+%Y-%m-%d %H:%M:%S'), ${age} мин назад)"
+  if [ "$how" = implicit ] && [ "$SCENE_MAX_MIN" -gt 0 ] && [ "$age" -gt "$SCENE_MAX_MIN" ]; then
+    die "STALE_SCENE: последний кадр в $SCREENS старше ${SCENE_MAX_MIN} мин (${age} мин) — это НЕ текущий экран.
+    Сделай свежий: $0 shot <label>   (или сними проверку: RC_SCENE_MAX_MIN=0)"
+  fi
+}
+# Pick the scene into the global SCENE. Deliberately NOT a command substitution:
+# `die` inside $( ) would only kill the subshell and the caller would sail on with
+# an empty path — the very kind of silent failure this whole change is about.
+SCENE=""
+_scene(){
+  local s="${1:-}"
+  if [ -n "$s" ]; then [ -f "$s" ] || die "нет такого кадра: $s"; _scene_guard "$s" explicit
+  else s="$(_last_scene)"; [ -n "$s" ] || die "no scene; run shot first"; _scene_guard "$s" implicit; fi
+  SCENE="$s"
+}
+
 usage(){
   sed -n '1,32p' "$0"
   cat >&2 <<'EOF'
 
 commands:
-  shot <label>                         capture DISPLAY -> screens/<label>.png(+jpg)
+  shot <label>                         capture DISPLAY -> screens/<label>.png(+jpg); prints capture TIME, path last
+  where                                which DISPLAY / screens dir / staleness limit THIS run uses
+  clean [days]                         move frames older than N days (default 1) to screens/attic/<ts>/ (nothing deleted)
   find <template> [scene]              template-match -> exact centre + score (JSON)
   crop <x,y,w,h> <out> [scale] [--grid]   haiku-eye crop (coords computed, not eyeballed)
   grid <out> [step]                    stamp a labelled coordinate ruler over last shot
@@ -87,19 +127,67 @@ commands:
 
 env: RC_DISPLAY RC_SCREENS RC_USER RC_MIN_SCORE RC_LIVE(=1 to really click)
      RC_AD_ID RC_RD_ID RC_PREFER(rustdesk|anydesk)
+     RC_SCENE_MAX_MIN  max age (min) of an IMPLICITLY picked scene before commands refuse
+                       to reason about it (default 30; 0 = off). Explicitly named scenes are
+                       trusted but their age is still printed. See FIELD_NOTES: kso-anydesk-stale-frame.
 EOF
 }
 
 case "${1:-}" in
   shot)
+    # Prints WHEN the frame was taken and from which display, then the path as the
+    # LAST line (callers do `| tail -1`). A silent path alone is what let a July
+    # frame pass for "now".
     L="${2:-shot}"
     _shot_to "$SCREENS/$L.png" || die "capture failed on $DISPLAY_ (is the display up?)"
-    command -v convert >/dev/null && convert "$SCREENS/$L.png" -quality 88 "$SCREENS/$L.jpg" 2>/dev/null
+    if command -v convert >/dev/null; then
+      convert "$SCREENS/$L.png" -quality 88 "$SCREENS/$L.jpg" 2>/dev/null \
+        || { rm -f "$SCREENS/$L.jpg"; log "SHOT_WARN: convert не собрал JPG — .jpg удалён, чтобы не остался старый"; }
+    fi
+    OLD=$(find "$SCREENS" -maxdepth 1 -name '*.png' ! -name "$L.png" -mmin +360 2>/dev/null | head -3)
+    [ -n "$OLD" ] && { log "ВНИМАНИЕ: в $SCREENS лежат СТАРЫЕ кадры (>6 ч) — не путать с текущим:"; log "$(printf '%s' "$OLD" | sed 's/^/  /')"; }
+    echo "снят $(date '+%Y-%m-%d %H:%M:%S') DISPLAY=$DISPLAY_ size=$(stat -c%s "$SCREENS/$L.png")б"
     echo "$SCREENS/$L.png"
     ;;
 
+  where)
+    # which display and which frame directory THIS invocation uses — RC_SCREENS is
+    # easy to pass on one call and forget on the next, and then frames diverge.
+    echo "DISPLAY=$DISPLAY_"; echo "SCREENS=$SCREENS"; echo "RC_SCENE_MAX_MIN=$SCENE_MAX_MIN"
+    ls -la --time-style=+%Y-%m-%d_%H:%M:%S "$SCREENS" 2>/dev/null | tail -n +2
+    ;;
+
+  clean)
+    # move frames older than N days (default 1) out of the way into screens/attic/<date>/
+    # Nothing is deleted: stale frames only have to stop being the newest .png.
+    #
+    # 🔴 Reference images STAY. vmatch templates live right next to the shots (*_tmpl*.png,
+    # tmpl_*.png, *template*) and are SUPPOSED to be old — sweeping them into attic breaks
+    # find/click-template. Extra exceptions: one glob per line in $SCREENS/.keepframes.
+    DAYS="${2:-1}"; AT="$SCREENS/attic/$(date +%Y%m%d_%H%M%S)"
+    MOVE=(); KEPT=()
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      b="$(basename "$f")"; k=0
+      case "$b" in *tmpl*|*template*|*etalon*|*эталон*) k=1 ;; esac
+      if [ "$k" = 0 ] && [ -r "$SCREENS/.keepframes" ]; then
+        while IFS= read -r g; do
+          [ -n "$g" ] || continue; case "$g" in \#*) continue ;; esac
+          case "$b" in $g) k=1; break ;; esac
+        done < "$SCREENS/.keepframes"
+      fi
+      if [ "$k" = 1 ]; then KEPT+=("$b"); else MOVE+=("$f"); fi
+    done < <(find "$SCREENS" -maxdepth 1 -type f \( -name '*.png' -o -name '*.jpg' \) -mtime +"$DAYS" 2>/dev/null)
+    [ ${#KEPT[@]} -gt 0 ] && echo "clean: эталоны оставлены на месте (${#KEPT[@]}): $(printf '%s ' "${KEPT[@]}")"
+    N=${#MOVE[@]}
+    if [ "$N" = "0" ]; then echo "clean: нечего убирать (нет кадров старше ${DAYS} сут в $SCREENS)"; exit 0; fi
+    mkdir -p "$AT"
+    printf '%s\0' "${MOVE[@]}" | xargs -0 mv -t "$AT" 2>/dev/null
+    echo "clean: убрано $N кадров старше ${DAYS} сут -> $AT (не удалено)"
+    ;;
+
   find)
-    T="${2:?need template}"; S="${3:-$(_last_scene)}"; [ -n "$S" ] || die "no scene"
+    T="${2:?need template}"; _scene "${3:-}"; S="$SCENE"
     OFF="$(_read_offset)"
     "$PY" "$LIB/vmatch.py" find --scene "$S" --template "$T" \
         --min-score "$MIN_SCORE" --offset "$OFF" --json
@@ -108,12 +196,12 @@ case "${1:-}" in
   crop)
     R="${2:?need x,y,w,h}"; O="${3:?need out}"; SC="${4:-3.0}"; shift 4 2>/dev/null || shift $#
     GRID=""; for a in "$@"; do [ "$a" = "--grid" ] && GRID="--grid"; done
-    S="$(_last_scene)"; [ -n "$S" ] || die "no scene; run shot first"
+    _scene ""; S="$SCENE"
     "$PY" "$LIB/veye.py" crop --scene "$S" --out "$O" --region "$R" --scale "$SC" $GRID --json
     ;;
 
   grid)
-    O="${2:?need out}"; ST="${3:-100}"; S="$(_last_scene)"; [ -n "$S" ] || die "no scene"
+    O="${2:?need out}"; ST="${3:-100}"; _scene ""; S="$SCENE"
     "$PY" "$LIB/veye.py" grid --scene "$S" --out "$O" --step "$ST" --json
     ;;
 
@@ -125,12 +213,12 @@ case "${1:-}" in
     # ocr <text> [scene] [region X,Y,W,H] [scale]
     # 🔴 Region+scale matter: on a full 1920x1080 frame tesseract reads none of the small UI
     # captions, so a "not found" there is not evidence of absence. Crop to the area and scale 3x.
-    TX="${2:?need text}"; S="${3:-$(_last_scene)}"; [ -n "$S" ] || die "no scene"
-    RG="${4:-}"; SC="${5:-1.0}"
+    TX="${2:?need text}"; _scene "${3:-}"; S="$SCENE"
+    RG="${4:-}"; SC="${5:-1.0}"; PSM="${6:-3}"
     if [ -n "$RG" ]; then
-      "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --region "$RG" --scale "$SC" --json
+      "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --region "$RG" --scale "$SC" --psm "$PSM" --json
     else
-      "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --scale "$SC" --json
+      "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --scale "$SC" --psm "$PSM" --json
     fi
     ;;
 
@@ -167,7 +255,10 @@ case "${1:-}" in
         echo "DRY-RUN would click $CX $CY"
       fi
       sleep 0.4
-      _shot_to "$SCREENS/_ct_after.png"
+      # 🔴 The after-frame decides whether the click worked. If capture fails here we
+      # must NOT fall back to whatever _ct_after.png was left by an earlier run — that
+      # verdict would be about a frame from another session entirely.
+      _shot_to "$SCREENS/_ct_after.png" || die "capture failed AFTER the click — вердикт по клику невозможен (кадр не сравнить)"
       V=$("$PY" "$LIB/vmatch.py" verify --before "$SCREENS/_ct_before.png" \
             --after "$SCREENS/_ct_after.png" --region "$BX,$BY,$BW,$BH" --json)
       echo "verify[$attempt]: $V"
@@ -202,7 +293,13 @@ print("%d,%d"%tuple(d["offset"])) if d.get("ok") else print("")' )
     # classify() only measures picture content -- a dead session leaves the last frame on :99 and
     # still scores "live". The give-away is the viewer's own modal: alongside the session window
     # ("<id>@<host> - Remote Desktop - RustDesk") a bare "RustDesk" dialog appears on disconnect.
-    wins="$(DISPLAY="$RC_DISPLAY" xdotool search --name "." getwindowname %@ 2>/dev/null)"
+    # 🔴 Two bugs lived here: it read $RC_DISPLAY (unset -> `set -u` killed the
+    # subshell) and it could not tell "no viewer dialog" from "could not look at all"
+    # — with an empty window list it printed stale:false and exited 0, i.e. the
+    # stale-frame detector itself reported "all good" while blind. Now: use the
+    # resolved display, and refuse to answer if the display is not reachable.
+    X xdpyinfo >/dev/null 2>&1 || die "livecheck: DISPLAY=$DISPLAY_ недоступен — ответить про свежесть кадра НЕЧЕМ (это не 'всё хорошо')"
+    wins="$(X xdotool search --name "." getwindowname %@ 2>/dev/null)"
     sess=0; dlg=0
     while IFS= read -r w; do
       case "$w" in
@@ -218,7 +315,9 @@ print("%d,%d"%tuple(d["offset"])) if d.get("ok") else print("")' )
     ;;
 
   classify)
-    F="${2:-$(_last_scene)}"; [ -n "$F" ] || die "no frame"
+    # 🔴 classify() only measures picture CONTENT: a month-old frame classifies as
+    # "live" just as happily as the real screen. Hence the age guard on the scene.
+    _scene "${2:-}"; F="$SCENE"
     "$PY" "$LIB/reconnect.py" classify --frame "$F" ${RC_BANNER_TEMPLATE:+--banner-template "$RC_BANNER_TEMPLATE"} --json
     ;;
 

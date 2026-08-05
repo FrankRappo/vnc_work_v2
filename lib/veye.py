@@ -40,6 +40,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 try:
     import cv2
@@ -221,7 +222,7 @@ def cmd_ocr(a):
         cv2.imwrite(scan, sub)
     try:
         proc = subprocess.run(
-            [exe, scan, tmp, "-l", a.lang, "tsv"],
+            [exe, scan, tmp, "-l", a.lang, "--psm", str(getattr(a, "psm", 3)), "tsv"],
             capture_output=True, text=True, timeout=60)
         tsv_path = tmp + ".tsv"
         if proc.returncode != 0 or not os.path.exists(tsv_path):
@@ -268,7 +269,25 @@ def cmd_ocr(a):
             os.remove(scan)
 
 
+# 🔴 Возраст сцены едет в КАЖДОМ ответе (kso-anydesk-stale-frame, 2026-08-05). Разбор идёт по
+# файлу, и файл может быть каким угодно старым: картинка июльская, а JSON приходит бодрый и
+# правдоподобный. Ответ без возраста кадра — это ответ «про какой-то экран», а не про текущий.
+# rc.sh отказывается брать неявную старую сцену; здесь же страховка для ПРЯМЫХ вызовов veye.py.
+_SCENE_META = {}
+
+
+def _scene_meta(path):
+    try:
+        ts = os.path.getmtime(path)
+        return {"scene_taken": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)),
+                "scene_age_min": int((time.time() - ts) / 60)}
+    except OSError:
+        return {}
+
+
 def _emit(obj, as_json):
+    for k, v in _SCENE_META.items():
+        obj.setdefault(k, v)
     if as_json:
         print(json.dumps(obj, ensure_ascii=False))
     else:
@@ -302,8 +321,13 @@ def main(argv=None):
     o.add_argument("--min-conf", type=float, default=40.0); o.add_argument("--json", action="store_true")
     o.add_argument("--region", default=None, help="X,Y,W,H crop before OCR (coords mapped back)")
     o.add_argument("--scale", type=float, default=1.0, help="upscale factor before OCR (3.0 for small UI text)")
+    # 🔴 psm 11 (sparse text) is what makes scattered UI captions readable at all: with the
+    # default page-segmentation the 1C section-page link was found at conf 42 on the full frame
+    # and NOT AT ALL on the cropped one — the layout analyser decides there is no "page" there.
+    o.add_argument("--psm", type=int, default=3, help="tesseract page segmentation mode (11 = sparse UI text)")
 
     a = p.parse_args(argv)
+    _SCENE_META.update(_scene_meta(getattr(a, "scene", "") or ""))
     try:
         if a.cmd == "grid":
             res, rc = cmd_grid(a)

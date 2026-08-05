@@ -43,7 +43,10 @@ $g = [System.Drawing.Graphics]::FromImage($bmp)
 $g.CopyFromScreen($b.Left, $b.Top, 0, 0, $bmp.Size)
 $bmp.Save($Out, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose(); $bmp.Dispose()
-$info = @("SHOT=" + (Get-Item $Out).Length + " SIZE=" + $b.Width + "x" + $b.Height +
+# 🔴 TIME= (часы САМОЙ машины, снимок момента записи файла) — без него кадр невозможно отличить от
+# вчерашнего: картинка правдоподобна всегда (kso-anydesk-stale-frame, 2026-08-05).
+$info = @("SHOT=" + (Get-Item $Out).Length + " TIME=" + (Get-Item $Out).LastWriteTime.ToString('yyyy-MM-dd_HH:mm:ss') +
+          " SIZE=" + $b.Width + "x" + $b.Height +
           " FOCUSED=" + $($script:hit -ne [IntPtr]::Zero))
 $info += ($titles | ForEach-Object { "WIN " + $_ })
 $info | Out-File -FilePath ($Out + ".txt") -Encoding ascii

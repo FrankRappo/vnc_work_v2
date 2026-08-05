@@ -35,7 +35,9 @@ Exit codes: 0 = ok / found / verified-changed, 2 = not found / below threshold,
 """
 import argparse
 import json
+import os
 import sys
+import time
 
 try:
     import cv2
@@ -267,7 +269,25 @@ def calibrate(scene_path, anchor_path, expect=None, min_score=0.80):
     }
 
 
+# 🔴 Возраст сцены — в каждом ответе (kso-anydesk-stale-frame, 2026-08-05). `find` по кадру
+# недельной давности возвращает такой же уверенный JSON со score 0.98, как по свежему, и по этим
+# координатам потом кликают. rc.sh закрывает неявный выбор старой сцены; это — страховка для
+# прямых вызовов vmatch.py.
+_SCENE_META = {}
+
+
+def _scene_meta(path):
+    try:
+        ts = os.path.getmtime(path)
+        return {"scene_taken": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)),
+                "scene_age_min": int((time.time() - ts) / 60)}
+    except OSError:
+        return {}
+
+
 def _emit(obj, as_json, ok_key=None):
+    for k, v in _SCENE_META.items():
+        obj.setdefault(k, v)
     if as_json:
         print(json.dumps(obj, ensure_ascii=False))
     else:
@@ -304,6 +324,7 @@ def main(argv=None):
     pc.add_argument("--json", action="store_true")
 
     args = p.parse_args(argv)
+    _SCENE_META.update(_scene_meta(getattr(args, "scene", "") or getattr(args, "after", "") or ""))
 
     try:
         if args.cmd == "find":
