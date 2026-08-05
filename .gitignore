@@ -8,3 +8,7 @@ __pycache__/
 fixtures/_crop_test.png
 fixtures/.ctcnt
 fixtures/*.ocr*
+# кадры, убранные командой `clean` (attic = карантин залежавшихся снимков, не история проекта)
+screens/attic/
+screens_t67/attic/
+srvshot/attic/
