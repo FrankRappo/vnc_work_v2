@@ -164,12 +164,20 @@ case "${1:-}" in
     # 🔴 Reference images STAY. vmatch templates live right next to the shots (*_tmpl*.png,
     # tmpl_*.png, *template*) and are SUPPOSED to be old — sweeping them into attic breaks
     # find/click-template. Extra exceptions: one glob per line in $SCREENS/.keepframes.
+    # 🔴 Git-tracked frames stay too: some frame directories hold COMMITTED evidence attached to a
+    # report (screens_t67/* — the T67 attachment). Sweeping those into attic shows up as 21 staged
+    # deletions and quietly detaches the evidence from its report. Learned the hard way, 2026-08-05.
     DAYS="${2:-1}"; AT="$SCREENS/attic/$(date +%Y%m%d_%H%M%S)"
+    TRACKED=""
+    if git -C "$SCREENS" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      TRACKED="$(git -C "$SCREENS" ls-files -- . 2>/dev/null | sed 's|.*/||')"
+    fi
     MOVE=(); KEPT=()
     while IFS= read -r f; do
       [ -n "$f" ] || continue
       b="$(basename "$f")"; k=0
       case "$b" in *tmpl*|*template*|*etalon*|*эталон*) k=1 ;; esac
+      [ "$k" = 0 ] && [ -n "$TRACKED" ] && printf '%s\n' "$TRACKED" | grep -qxF "$b" && k=1
       if [ "$k" = 0 ] && [ -r "$SCREENS/.keepframes" ]; then
         while IFS= read -r g; do
           [ -n "$g" ] || continue; case "$g" in \#*) continue ;; esac
@@ -178,7 +186,7 @@ case "${1:-}" in
       fi
       if [ "$k" = 1 ]; then KEPT+=("$b"); else MOVE+=("$f"); fi
     done < <(find "$SCREENS" -maxdepth 1 -type f \( -name '*.png' -o -name '*.jpg' \) -mtime +"$DAYS" 2>/dev/null)
-    [ ${#KEPT[@]} -gt 0 ] && echo "clean: эталоны оставлены на месте (${#KEPT[@]}): $(printf '%s ' "${KEPT[@]}")"
+    [ ${#KEPT[@]} -gt 0 ] && echo "clean: оставлены на месте — эталоны и файлы под git (${#KEPT[@]}): $(printf '%s ' "${KEPT[@]}")"
     N=${#MOVE[@]}
     if [ "$N" = "0" ]; then echo "clean: нечего убирать (нет кадров старше ${DAYS} сут в $SCREENS)"; exit 0; fi
     mkdir -p "$AT"
