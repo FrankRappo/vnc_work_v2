@@ -32,8 +32,60 @@ mk_setselect.py   генератор JS: выбрать <option> в ASP.NET-др
 mk_textsearch.py  генератор JS: вбить фразу в поиск и отправить форму
 mk_zipindex.py    генератор JS: прочитать оглавление УДАЛЁННОГО .zip через HTTP Range (без скачивания)
 mk_rect.py        генератор JS: координаты вьюпорта для элемента по CSS-селектору (доверенный клик)
-js/               готовые выражения: links, form_dump, results_rows, grid_rows, cookies, ua, …
+cdp_linux.py      ТО ЖЕ САМОЕ, но для LINUX-хоста: старт Chrome + CDP на чистом python3
+                  (свой RFC6455-клиент, без pip/node). См. «Linux-близнец» ниже
+js/               готовые выражения: links, form_dump, results_rows, grid_rows, cookies, ua,
+                  pagetext_lin, shoplist_lin, …
 ```
+
+## Linux-близнец: `cdp_linux.py` (T198)
+
+`cdp_start.ps1` + `cdp_get.ps1` живут на Windows. Когда браузер должен стоять на ЛИНУКСЕ —
+например на нашем VPS-джампе `178.253.55.128`, чтобы читать российские магазины с российского
+IP, — работает `cdp_linux.py`. Один файл, **только стандартная библиотека**: на VPS есть
+python3 и `google-chrome`, но нет ни pip, ни node, ни `websocket-client`, а ставить пакеты на
+джамп, через который идут ВСЕ обратные туннели, ради исследовательской задачи нельзя. Поэтому
+WebSocket-клиент написан руками поверх `socket` (~90 строк).
+
+```bash
+scp cdp_linux.py root@<host>:/root/            # положить
+ssh root@<host> 'python3 /root/cdp_linux.py start'          # идемпотентно
+ssh root@<host> 'python3 /root/cdp_linux.py status'         # UP | DOWN
+
+# страница -> текст
+ssh root@<host> "python3 /root/cdp_linux.py get 'https://…' --waitms 30000 --js /root/page.js"
+# действие на уже открытой странице / клик по координатам вьюпорта
+ssh root@<host> "python3 /root/cdp_linux.py click 657,657 --clicks 2 --btn right"
+ssh root@<host> "python3 /root/cdp_linux.py cookies --url https://…"
+ssh root@<host> "python3 /root/cdp_linux.py stop"
+```
+
+`--js` принимает выражение строкой ИЛИ путь к файлу (выражения из `js/` работают как есть).
+`--wait <предикат>` опрашивает до истины и печатает `WAIT=OK|TIMEOUT`; по умолчанию предикат
+= «мы уже не на антибот-заглушке» (тело с реальным текстом и без маркеров qrator/ddos-guard).
+`--wait -` выключает ожидание. Код возврата: 0 — значение получено, 4 — `WAIT=TIMEOUT`,
+3 — ошибка драйвера. Переменные: `CDP_PORT`, `CDP_PROFILE`, `CDP_CHROME`, `CDP_UA`.
+
+### Гочи Linux-пути (стоили кругов отладки)
+
+1. **Chrome ≥112 требует `--headless=new`**; старый `--headless` часть флагов молча игнорирует.
+2. **Под root на VPS обязателен `--no-sandbox`**, плюс `--disable-dev-shm-usage` — иначе Chrome
+   умирает на маленьком `/dev/shm`.
+3. **UA headless-Chrome содержит `HeadlessChrome/<ver>`, и антиботы это читают.** UA
+   переопределяется при запуске (`--user-agent`).
+4. 🔴 **GUID рукопожатия RFC6455 — `258EAFA5-E914-47DA-95CA-C5AB0DC85B11`.** Ошибка в одном
+   символе даёт не падение, а «`Sec-WebSocket-Accept` mismatch» и молчаливо неверную проверку:
+   DevTools-сервер Chrome апгрейд всё равно выполняет. Сверять с тестовым вектором RFC:
+   ключ `dGhlIHNhbXBsZSBub25jZQ==` → accept `s3pPLMBiTxaQ9kYGzzhZRbK+xOo=`.
+5. **`--dump-dom` челлендж не проходит** (одна навигация и выход, а челленджу нужно поставить
+   cookie и перезагрузить себя) — ровно поэтому порт отладки, а не `--dump-dom`.
+6. 🔴 **403 ≠ 401.** `HTTP 401` + JS-заглушка = челлендж, настоящий браузер его решит.
+   `HTTP 403` с текстом «Доступ к сайту запрещён. IP: …» = IP забанен на уровне Qrator, и
+   браузер тут не поможет — нужен другой выход. На T198 так закрылся `dns-shop.ru`: 401 по
+   curl превратился в 403 после того, как Chrome решил челлендж, и с ОБОИХ наших IP.
+7. **SSH-туннель `-D` (SOCKS) для полноценных страниц не тянет** — головная блокировка одного
+   TCP-соединения, страница Ситилинка не укладывалась в 60 с. Быстрее и надёжнее гонять
+   `curl`/Chrome НА самой удалённой машине и забирать текст (0.5 с на ту же страницу).
 
 ## Вождение UI: доверенный клик, ожидание, iframe (T71)
 
