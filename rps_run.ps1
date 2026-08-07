@@ -25,5 +25,17 @@ try {
   $sw.WriteLine($_.ScriptStackTrace)
 } finally {
   $sw.Flush(); $sw.Close()
+  # 🔴 SELF-DELETE THE SHIPPED SCRIPT, SERVER-SIDE, ALWAYS (T194, 2026-08-07).
+  # The shipped script routinely carries SUBSTITUTED SECRETS: the kso pwrun wrappers replace
+  # @@P1C@@ / @@PKSO@@ / @@PPG@@ with real passwords before upload. Until now the only cleanup was
+  # the `cmd /c del` at the end of rps.sh — i.e. CLIENT-side, AFTER the output pull. Any run that
+  # outlived the caller (SSH drop, agent Bash timeout, Ctrl-C) therefore left a plaintext-password
+  # .ps1 sitting on the remote machine forever. Found on the live 1C server DESKTOP-VGVHEOU:
+  # three such files from 06.08, ~24 hours old, 2689 bytes each.
+  # Deleting here means the cleanup survives whatever happens to the caller. This is the same
+  # rule the kso side calls T137 ("the script that puts a cred file on the server must remove it
+  # itself"), now enforced by the transport instead of by every caller remembering to.
+  try { Remove-Item -LiteralPath $Script -Force -ErrorAction Stop } catch {}
 }
 Write-Output ("RPS_OK bytes=" + (Get-Item $Out).Length)
+Write-Output ("RPS_SCRIPT_DELETED=" + (-not (Test-Path -LiteralPath $Script)))

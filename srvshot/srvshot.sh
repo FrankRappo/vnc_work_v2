@@ -26,6 +26,11 @@ RDIR="${RDIR:-C:/Users/User}"
 OUT="${1:?usage: srvshot.sh <local-out.png> [focus-title-substring] [settle-sec]}"
 FOCUS="${2:-}"
 SETTLE="${3:-3}"
+# 🔴 RUNAS (T194, 2026-08-07): учётка, под которой регистрируется задача /it. Пустая = сервер
+# определит владельца интерактивной сессии сам (см. shot_run.ps1). Раньше было жёстко «User»,
+# и на машине с другим логином (1С-сервер входит как «Админ») кадр не снимался вовсе, а
+# выглядело это как таймаут съёмки.
+RUNAS="${RUNAS:-}"
 WIN_PNG="${RDIR//\//\\}\\srvshot.png"
 
 # 1. Локальный артефакт сносим ДО попытки: если кадр не приедет, под этим путём не должно остаться
@@ -37,7 +42,7 @@ bash "$SCP" "$DIR/shot_run.ps1"   "$RHOST:$RDIR/srvshot_run.ps1"   >/dev/null 2>
 
 # 2. Съёмка. shot_run.ps1 сам сносит прошлый .png и .txt на удалённой стороне и ждёт маркер;
 #    маркер SHOT=<байты> TIME=<часы удалённой машины> — единственное доказательство, что кадр НОВЫЙ.
-RESP=$(bash "$SSH" "powershell -NoProfile -ExecutionPolicy Bypass -File ${RDIR//\//\\}\\srvshot_run.ps1 -Png $WIN_PNG -Inner ${RDIR//\//\\}\\srvshot_inner.ps1 -FocusTitle \"$FOCUS\" -SettleSec $SETTLE" 2>&1 | grep -aE "^SHOT=|^WIN " | head -20)
+RESP=$(bash "$SSH" "powershell -NoProfile -ExecutionPolicy Bypass -File ${RDIR//\//\\}\\srvshot_run.ps1 -Png $WIN_PNG -Inner ${RDIR//\//\\}\\srvshot_inner.ps1 -FocusTitle \"$FOCUS\" -SettleSec $SETTLE -RunAs \"$RUNAS\"" 2>&1 | grep -aE "^SHOT=|^WIN |^SHOT_RUNAS=" | head -20)
 MARK=$(printf '%s\n' "$RESP" | grep -a -m1 '^SHOT=')
 printf '%s\n' "$RESP" | grep -a '^WIN ' | head -12
 
