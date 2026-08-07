@@ -28,3 +28,5 @@ id_ed25519*
 screens/
 screens_t67/
 srvshot/
+# профили браузера с ЖИВОЙ залогиненной сессией — данные, не код
+profile_backups/*/
