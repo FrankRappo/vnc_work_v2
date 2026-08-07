@@ -14,8 +14,8 @@
 #   bash cdpq.sh https://www.atol.ru/ /tmp/links.txt 12000 ./js/links.js
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
-SSH="${SSH:-/work/vnc_work/ofd_ssh.sh}"
-SCP="${SCP:-/work/vnc_work/ofd_scp.sh}"
+SSH="${SSH:-$DIR/../ofd_ssh.sh}"
+SCP="${SCP:-$DIR/../ofd_scp.sh}"
 RHOST="${RHOST:-ofd}"
 RDIR="${RDIR:-C:/Users/User}"
 PORT="${CDP_PORT:-9222}"

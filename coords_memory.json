@@ -1,0 +1,329 @@
+{
+ "version": 1,
+ "pages": {
+  "dostavka.yandex.ru/account/profile/add-balance": {
+   "elements": {
+    "delivery-settings": {
+     "text": "Delivery settings",
+     "tag": "a",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 120,
+     "y": 448,
+     "w": 224,
+     "h": 40,
+     "hits": 1,
+     "lastTs": "2026-06-04T21:29:26.876Z"
+    },
+    "nav-support": {
+     "text": "Support",
+     "tag": "a",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 120,
+     "y": 528,
+     "w": 224,
+     "h": 40,
+     "hits": 1,
+     "lastTs": "2026-06-04T21:29:27.218Z"
+    }
+   }
+  },
+  "www.figma.com/design/fmqagpboojkytzp4jqda5z/untitled": {
+   "elements": {
+    "continue-with-google": {
+     "text": "Continue with Google",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 952,
+     "y": 479,
+     "w": 382,
+     "h": 48,
+     "zoomed": null,
+     "hits": 1,
+     "lastTs": "2026-06-10T10:31:24.959Z"
+    },
+    "request-access": {
+     "text": "Request access",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 951,
+     "y": 573,
+     "w": 107,
+     "h": 32,
+     "zoomed": null,
+     "hits": 1,
+     "lastTs": "2026-06-10T10:55:07.619Z"
+    },
+    "continue": {
+     "text": "Continue",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 523,
+     "y": 762,
+     "w": 91,
+     "h": 38,
+     "zoomed": "0.8",
+     "hits": 6,
+     "lastTs": "2026-06-10T11:53:30.077Z"
+    },
+    "work": {
+     "text": "Work",
+     "tag": "label",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 186,
+     "y": 324,
+     "w": 54,
+     "h": 41,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:48:30.087Z"
+    },
+    "software-development": {
+     "text": "Software development",
+     "tag": "label",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 327,
+     "y": 375,
+     "w": 154,
+     "h": 41,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:49:46.348Z"
+    },
+    "freelance": {
+     "text": "Freelance",
+     "tag": "label",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 287,
+     "y": 324,
+     "w": 81,
+     "h": 41,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:50:32.128Z"
+    },
+    "just-me": {
+     "text": "Just me",
+     "tag": "label",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 194,
+     "y": 356,
+     "w": 70,
+     "h": 41,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:52:47.452Z"
+    },
+    "yes-many-times": {
+     "text": "Yes, many times",
+     "tag": "label",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 217,
+     "y": 356,
+     "w": 117,
+     "h": 41,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:53:25.371Z"
+    },
+    "starter": {
+     "text": "Starter",
+     "tag": "label",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 587,
+     "y": 148,
+     "w": 1,
+     "h": 1,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:54:30.814Z"
+    },
+    "finish": {
+     "text": "Finish",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 1280,
+     "y": 762,
+     "w": 73,
+     "h": 38,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:54:35.383Z"
+    },
+    "export-untitled": {
+     "text": "Export Untitled",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 1807,
+     "y": 237,
+     "w": 166,
+     "h": 19,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T11:57:54.601Z"
+    }
+   }
+  },
+  "www.figma.com/signup": {
+   "elements": {
+    "continue-with-email": {
+     "text": "Continue with email",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 952,
+     "y": 584,
+     "w": 286,
+     "h": 38,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T10:45:23.835Z"
+    },
+    "create-account": {
+     "text": "Create account",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 952,
+     "y": 602,
+     "w": 286,
+     "h": 38,
+     "zoomed": "0.8",
+     "hits": 1,
+     "lastTs": "2026-06-10T10:46:50.026Z"
+    }
+   }
+  },
+  "www.figma.com/files/team/1646490845986511479/recents-and-sharing": {
+   "elements": {
+    "continue": {
+     "text": "Continue",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 523,
+     "y": 762,
+     "w": 91,
+     "h": 38,
+     "zoomed": "0.8",
+     "hits": 2,
+     "lastTs": "2026-06-10T11:27:32.407Z"
+    }
+   }
+  },
+  "cp.beget.com/domains/administrator": {
+   "elements": {
+    "chg_admin_toggle": {
+     "text": "Change domain administrator",
+     "tag": "label",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 905,
+     "y": 410,
+     "w": 203,
+     "h": 24,
+     "zoomed": null,
+     "hits": 1,
+     "lastTs": "2026-06-25T21:45:55.351Z"
+    }
+   }
+  },
+  "business.tbank.ru/oplata/mpa/shops": {
+   "elements": {
+    "магазины": {
+     "text": "Магазины",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 751,
+     "y": 96,
+     "w": 63,
+     "h": 64,
+     "zoomed": null,
+     "hits": 1,
+     "lastTs": "2026-06-30T23:32:32.363Z"
+    }
+   }
+  },
+  "business.tbank.ru/oplata/mpa/shops/ecom": {
+   "elements": {
+    "orvelix-ru": {
+     "text": "orvelix.ru",
+     "tag": "a",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 442,
+     "y": 342,
+     "w": 53,
+     "h": 20,
+     "zoomed": null,
+     "hits": 1,
+     "lastTs": "2026-06-30T23:33:56.714Z"
+    }
+   }
+  },
+  "business.tbank.ru/oplata/mpa/shops/ecom/direct/915465/terminals": {
+   "elements": {
+    "терминалы": {
+     "text": "Терминалы",
+     "tag": "a",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 1295,
+     "y": 212,
+     "w": 70,
+     "h": 64,
+     "zoomed": null,
+     "hits": 1,
+     "lastTs": "2026-06-30T23:47:48.331Z"
+    },
+    "сохранить": {
+     "text": "Сохранить",
+     "tag": "button",
+     "role": null,
+     "ariaLabel": null,
+     "id": null,
+     "x": 597,
+     "y": 860,
+     "w": 115,
+     "h": 56,
+     "zoomed": null,
+     "hits": 1,
+     "lastTs": "2026-07-01T00:03:07.189Z"
+    }
+   }
+  }
+ }
+}

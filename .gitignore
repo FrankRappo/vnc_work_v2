@@ -12,3 +12,19 @@ fixtures/*.ocr*
 screens/attic/
 screens_t67/attic/
 srvshot/attic/
+
+# ── T201: секреты каналов и GUI-клиентов. В git не должны попасть НИКОГДА ──
+# приватные ключи обратных SSH-туннелей + known_hosts + креды Windows
+ssh_channel/
+# снимок настроек RustDesk/AnyDesk: пароли, токены, ключ нашего rendezvous-сервера
+profiles/
+*.pem
+id_rsa*
+id_ed25519*
+*_me
+*_tunnel
+*.creds
+# кадры боевых экранов магазина (любой каталог захвата целиком)
+screens/
+screens_t67/
+srvshot/

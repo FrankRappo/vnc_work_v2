@@ -1,11 +1,11 @@
 # vnc_work_v2 — надёжный таргетинг для удалённого управления (AnyDesk/RustDesk/VNC)
 
-v2 чинит главную боль пиксельных драйверов `/work/vnc_work` (anydesk_kso.sh,
+v2 чинит главную боль пиксельных драйверов `/work/vnc_work_v2-vm121-review` (anydesk_kso.sh,
 rustdesk/x99.sh): **слепой клик по угаданным координатам**. Там цикл был
 «scrot → Read jpg → прикинуть X,Y на глаз → xdotool click» — и haiku по
 уменьшенному кадру мазал на ±20–50 px, попадая между кнопок.
 
-Оригинал (`/work/vnc_work`) НЕ тронут — это отдельная папка с рабочим ядром.
+Оригинал (`/work/vnc_work_v2-vm121-review`) НЕ тронут — это отдельная папка с рабочим ядром.
 
 ---
 
@@ -73,7 +73,7 @@ template-match — не страдает).
 ## Быстрый старт (офлайн, на фикстуре)
 
 ```bash
-cd /work/vnc_work_v2
+cd /work/vnc_work_v2-vm121-review
 python3 fixtures/make_fixtures.py     # сгенерить локальные скрины
 bash examples/demo.sh                 # сквозной проход всех механизмов
 bash test/run_tests.sh                # 14 тестов + dry-run драйвера
@@ -102,7 +102,7 @@ bash rc.sh reconnect           # план (dry); --run + RC_LIVE=1 чтобы в
 ```
 
 Драйвер `rc.sh reconnect` делегирует сам коннект **оригинальным** скриптам
-`/work/vnc_work/rustdesk/connect.sh` и `anydesk_kso.sh` (v2 их не дублирует и не
+`/work/vnc_work_v2-vm121-review/rustdesk/connect.sh` и `anydesk_kso.sh` (v2 их не дублирует и не
 трогает) — задай `RC_RD_ID`/`RC_AD_ID` и запускай под `dangerouslyDisableSandbox`.
 
 ---

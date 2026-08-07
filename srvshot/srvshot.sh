@@ -19,8 +19,8 @@
 #   bash srvshot.sh /tmp/screen.png
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
-SSH="${SSH:-/work/vnc_work/ofd_ssh.sh}"
-SCP="${SCP:-/work/vnc_work/ofd_scp.sh}"
+SSH="${SSH:-$DIR/../ofd_ssh.sh}"
+SCP="${SCP:-$DIR/../ofd_scp.sh}"
 RHOST="${RHOST:-ofd}"
 RDIR="${RDIR:-C:/Users/User}"
 OUT="${1:?usage: srvshot.sh <local-out.png> [focus-title-substring] [settle-sec]}"

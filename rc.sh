@@ -340,9 +340,9 @@ print("%d,%d"%tuple(d["offset"])) if d.get("ok") else print("")' )
     fi
     # LIVE reconnect: walk the plan with backoff, verify liveness after each step.
     SCHED=$("$PY" "$LIB/reconnect.py" backoff --json)
-    log "reconnect plan resolved; executing (RC_LIVE=1) — driver cmds relative to /work/vnc_work"
+    log "reconnect plan resolved; executing (RC_LIVE=1) — driver cmds relative to /work/vnc_work_v2-vm121-review"
     echo "$SCHED"
-    log "NOTE: rc.sh delegates the actual connect to the ORIGINAL drivers in /work/vnc_work; wire RC_AD_ID/RC_RD_ID and run those under dangerouslyDisableSandbox."
+    log "NOTE: rc.sh delegates the actual connect to the drivers that now live ALONGSIDE it in /work/vnc_work_v2-vm121-review (T201); wire RC_AD_ID/RC_RD_ID and run those under dangerouslyDisableSandbox."
     ;;
 
   selftest)

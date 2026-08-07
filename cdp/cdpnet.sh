@@ -13,8 +13,8 @@
 # Channel is parameterised exactly like cdpq.sh: SSH= SCP= RHOST= RDIR= CDP_PORT=
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
-SSH="${SSH:-/work/vnc_work/ofd_ssh.sh}"
-SCP="${SCP:-/work/vnc_work/ofd_scp.sh}"
+SSH="${SSH:-$DIR/../ofd_ssh.sh}"
+SCP="${SCP:-$DIR/../ofd_scp.sh}"
 RHOST="${RHOST:-ofd}"
 RDIR="${RDIR:-C:/Users/User}"
 PORT="${CDP_PORT:-9222}"
