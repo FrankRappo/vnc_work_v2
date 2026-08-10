@@ -116,6 +116,10 @@ commands:
   grid <out> [step]                    stamp a labelled coordinate ruler over last shot
   deproject <ox,oy> <scale> <px,py>    map a point read on a crop -> real screen pixel
   ocr <text> [scene]                   optional tesseract text->coord (degrades cleanly)
+  read [x,y,w,h] [scale] [psm] [scene] ДОСЛОВНЫЙ текст области кадра (tesseract, rus+eng)
+  hover <x> <y> [сек]                  подвести указатель без клика — показать подсказку 1С
+  type <строка>                        набрать текст в поле с фокусом (DRY-RUN unless RC_LIVE=1)
+  key <клавиши…>                       нажать клавиши: Return, Tab, ctrl+a (DRY-RUN unless RC_LIVE=1)
   click <x> <y>                        click (DRY-RUN unless RC_LIVE=1); applies offset
   click-template <template>            shot->find->click->VERIFY->retry-once (flagship)
   verify <before> <after> <x,y,w,h>    did the target region change? (exit 0=yes)
@@ -227,6 +231,70 @@ case "${1:-}" in
       "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --region "$RG" --scale "$SC" --psm "$PSM" --json
     else
       "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --scale "$SC" --psm "$PSM" --json
+    fi
+    ;;
+
+  read)
+    # read [x,y,w,h] [scale] [psm] [scene] — ДОСЛОВНЫЙ текст области последнего кадра.
+    # 🔴 Это то, чем отчёт цитирует экран, не загружая картинку в контекст дорогого агента (§27).
+    # Без региона читается весь кадр; мелкие подписи 1С при scale=1 не читаются вообще, поэтому
+    # умолчание scale=2 и psm=6 (сплошной блок). Для разрозненных подписей — psm 11.
+    RG="${2:-}"; SC="${3:-2.0}"; PS="${4:-6}"; _scene "${5:-}"; S="$SCENE"
+    if [ -n "$RG" ] && [ "$RG" != "-" ]; then
+      "$PY" "$LIB/veye.py" text --scene "$S" --region "$RG" --scale "$SC" --psm "$PS"
+    else
+      "$PY" "$LIB/veye.py" text --scene "$S" --scale "$SC" --psm "$PS"
+    fi
+    ;;
+
+  type)
+    # type <строка> — набрать текст в поле, имеющее фокус. DRY-RUN без RC_LIVE=1.
+    # 🔴 xdotool type --clearmodifiers: без него залипшая Shift/Alt даёт другой символ.
+    TXT="${2?need text}"
+    if [ "$LIVE" = "1" ]; then
+      X xdotool type --clearmodifiers --delay 40 -- "$TXT" && echo "typed ${#TXT} симв."
+    else
+      echo "DRY-RUN would type ${#TXT} симв.; set RC_LIVE=1 to execute"
+    fi
+    ;;
+
+  hover)
+    # hover <x> <y> — подвести указатель БЕЗ нажатия и подождать всплывающую подсказку.
+    # 🔴 Зачем: 1С обрезает длинный текст поля многоточием, и полный текст виден ТОЛЬКО в
+    # подсказке. Без hover отчёт цитирует «к оплате 2 000,00; начислим 100,00 бонус...» —
+    # то есть теряет ровно те даты, ради которых сценарий и проверяется.
+    X_="${2:?need x}"; Y_="${3:?need y}"; W="${4:-1.5}"
+    OFF="$(_read_offset)"; DX="${OFF%%,*}"; DY="${OFF##*,}"
+    FX=$((X_ + DX)); FY=$((Y_ + DY))
+    if [ "$LIVE" = "1" ]; then
+      X xdotool mousemove "$FX" "$FY" && sleep "$W" && echo "hovered $FX $FY (${W}s)"
+    else
+      echo "DRY-RUN would hover $FX $FY; set RC_LIVE=1 to execute"
+    fi
+    ;;
+
+  typefile)
+    # typefile <файл> — набрать содержимое файла, НЕ показывая его.
+    # 🔴 Для паролей: аргумент команды виден в `ps` всей машине, файл 600 — нет.
+    # Перевод строки в конце файла стал бы нажатием Enter, поэтому он срезается.
+    F="${2:?need file}"; [ -r "$F" ] || die "typefile: не читается $F"
+    N=$(LC_ALL=C.UTF-8 "$PY" -c 'import io,sys;print(len(io.open(sys.argv[1],encoding="utf-8").read().rstrip("\n")))' "$F")
+    if [ "$LIVE" = "1" ]; then
+      "$PY" -c 'import io,sys;sys.stdout.write(io.open(sys.argv[1],encoding="utf-8").read().rstrip("\n"))' "$F" \
+        | X xdotool type --clearmodifiers --delay 40 --file - && echo "typefile: набрано $N симв. (значение не печатается)"
+    else
+      echo "DRY-RUN would type $N симв. from $F; set RC_LIVE=1 to execute"
+    fi
+    ;;
+
+  key)
+    # key <клавиши…> — xdotool key (Return, ctrl+a, Tab…). DRY-RUN без RC_LIVE=1.
+    shift
+    [ $# -gt 0 ] || die "key: нужны клавиши"
+    if [ "$LIVE" = "1" ]; then
+      X xdotool key --clearmodifiers "$@" && echo "key: $*"
+    else
+      echo "DRY-RUN would press: $*; set RC_LIVE=1 to execute"
     fi
     ;;
 

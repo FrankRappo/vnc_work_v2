@@ -39,6 +39,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import sys
 import time
 
@@ -197,7 +198,7 @@ def cmd_ocr(a):
         return {"found": False, "reason": "tesseract not installed",
                 "hint": "install tesseract-ocr, or use template match (vmatch.py find)"}, 5
     img = _imread(a.scene)
-    tmp = a.scene + ".ocr"
+    tmp = os.path.join(tempfile.gettempdir(), "veye_ocr_%d" % os.getpid())
     # --region X,Y,W,H + --scale: CROP AND UPSCALE BEFORE OCR.
     # Small UI text (1C section panel, form field captions at 1920x1080) is not read at all
     # on the full frame: tesseract returned zero hits for nine visible section names, i.e. a
@@ -218,7 +219,7 @@ def cmd_ocr(a):
             sub = img[oy:oy + rh, ox:ox + rw]
         if scale != 1.0:
             sub = cv2.resize(sub, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
-        scan = a.scene + ".ocrscan.png"
+        scan = os.path.join(tempfile.gettempdir(), "veye_ocrscan_%d.png" % os.getpid())
         cv2.imwrite(scan, sub)
     try:
         proc = subprocess.run(
@@ -273,6 +274,51 @@ def cmd_ocr(a):
 # файлу, и файл может быть каким угодно старым: картинка июльская, а JSON приходит бодрый и
 # правдоподобный. Ответ без возраста кадра — это ответ «про какой-то экран», а не про текущий.
 # rc.sh отказывается брать неявную старую сцену; здесь же страховка для ПРЯМЫХ вызовов veye.py.
+def cmd_text(a):
+    """
+    FULL-TEXT read of a region — the missing half of `ocr`.
+
+    `ocr` answers "where is this word"; a report that must quote the screen ДОСЛОВНО needs
+    "what does this area say" instead. Without it the only way to get wording out of a frame
+    is to load the picture into an expensive agent's context — exactly what v2 exists to avoid.
+
+    Returns the recognised text on stdout, one screen line per output line (tesseract keeps
+    reading order). Crop+upscale before OCR for the same reason as in cmd_ocr: at 1:1 small
+    1C captions are not read at all, so an empty result on a full frame proves nothing.
+    """
+    exe = shutil.which("tesseract")
+    if not exe:
+        sys.stderr.write("veye text: tesseract not installed\n")
+        return {"ok": False, "reason": "tesseract not installed"}, 5
+    img = _imread(a.scene)
+    H, W = img.shape[:2]
+    sub = img
+    if a.region:
+        ox, oy, rw, rh = a.region
+        ox = max(0, min(ox, W - 1)); oy = max(0, min(oy, H - 1))
+        rw = max(1, min(rw, W - ox)); rh = max(1, min(rh, H - oy))
+        sub = img[oy:oy + rh, ox:ox + rw]
+    scale = float(a.scale or 1.0)
+    if scale != 1.0:
+        sub = cv2.resize(sub, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
+    if a.binarize:
+        g = cv2.cvtColor(sub, cv2.COLOR_BGR2GRAY) if sub.ndim == 3 else sub
+        sub = cv2.threshold(g, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    # 🔴 Промежуточный кадр НЕ кладём рядом со сценой: `_last_scene` в rc.sh берёт самый свежий
+    # *.png из каталога кадров, и файл-помощник тут же становится «текущим экраном» для
+    # следующей команды. Поймано фактом 10.08.2026: `read` дважды подряд читал свой же скан.
+    scan = os.path.join(tempfile.gettempdir(), "veye_textscan_%d.png" % os.getpid())
+    cv2.imwrite(scan, sub)
+    proc = subprocess.run([exe, scan, "stdout", "-l", a.lang, "--psm", str(a.psm),
+                           "--dpi", "300"], capture_output=True, text=True, timeout=120)
+    if proc.returncode != 0:
+        sys.stderr.write("veye text: tesseract failed: %s\n" % proc.stderr[-300:])
+        return {"ok": False, "reason": "tesseract failed"}, 2
+    out = "\n".join(l.rstrip() for l in proc.stdout.splitlines() if l.strip())
+    print(out)
+    return None, 0
+
+
 _SCENE_META = {}
 
 
@@ -326,6 +372,14 @@ def main(argv=None):
     # and NOT AT ALL on the cropped one — the layout analyser decides there is no "page" there.
     o.add_argument("--psm", type=int, default=3, help="tesseract page segmentation mode (11 = sparse UI text)")
 
+    t = sub.add_parser("text"); t.add_argument("--scene", required=True)
+    t.add_argument("--lang", default="rus+eng")
+    t.add_argument("--region", default=None, help="X,Y,W,H crop before OCR")
+    t.add_argument("--scale", type=float, default=2.0, help="upscale before OCR")
+    t.add_argument("--psm", type=int, default=6, help="6 = uniform block, 4 = column, 11 = sparse")
+    t.add_argument("--binarize", action="store_true", help="Otsu threshold before OCR")
+    t.add_argument("--json", action="store_true")
+
     a = p.parse_args(argv)
     _SCENE_META.update(_scene_meta(getattr(a, "scene", "") or ""))
     try:
@@ -350,6 +404,13 @@ def main(argv=None):
             if a.region and len(a.region) != 4:
                 sys.stderr.write("ocr: --region needs X,Y,W,H\n"); return 3
             res, rc = cmd_ocr(a)
+        elif a.cmd == "text":
+            a.region = _ints(a.region) if a.region else None
+            if a.region and len(a.region) != 4:
+                sys.stderr.write("text: --region needs X,Y,W,H\n"); return 3
+            res, rc = cmd_text(a)
+            if res is None:
+                return rc
         else:
             return 3
     except FileNotFoundError as e:
