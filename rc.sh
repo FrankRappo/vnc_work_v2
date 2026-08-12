@@ -122,6 +122,13 @@ commands:
   key <клавиши…>                       нажать клавиши: Return, Tab, ctrl+a (DRY-RUN unless RC_LIVE=1)
   click <x> <y>                        click (DRY-RUN unless RC_LIVE=1); applies offset
   click-template <template>            shot->find->click->VERIFY->retry-once (flagship)
+  modal [--json]                       🔴 ЧТО ЗА МОДАЛЬНОЕ ОКНО 1С сейчас: заголовок, текст,
+                                       кнопки с координатами (DOM и ЭКРАН), поля ввода
+  modal-click <подпись> [--via cdp|x]  🔴 нажать кнопку модального окна 1С С ПРОВЕРКОЙ по DOM
+                                       (--via x = настоящий указатель xdotool в НАТИВНЫХ пикселях)
+  modal-click --tmpl <эталон>          то же для ТОНКОГО клиента: по картинке, без CDP
+  modal-fill <текст>                   ввести текст в поле верхнего модального окна 1С
+  modal-key <Enter|Escape|…>           клавиша в верхнее модальное окно 1С
   verify <before> <after> <x,y,w,h>    did the target region change? (exit 0=yes)
   calibrate <anchor> [expectX,Y]       measure toolbar offset -> screens/.offset
   classify [frame]                     session liveness: live | black | banner
@@ -344,6 +351,28 @@ case "${1:-}" in
       log "no change after click[$attempt] -> re-locate & retry"; attempt=$((attempt+1))
     done
     [ "$ok" = "1" ] && echo "click-template OK" || { echo "click-template FAILED (no verified click)"; exit 2; }
+    ;;
+
+  modal|modal-click|modal-fill|modal-key)
+    # 🔴 МОДАЛЬНЫЕ ОКНА 1С. Две задачи подряд (T232 §4.1, T246 §8) встали на том, что кнопку «Да»
+    # в вопросе 1С не удавалось нажать ничем: ни OCR-координатами, ни якорем от соседнего слова,
+    # ни Enter, ни Left+Enter. Разбор — в lib/modal1c.py и в FIELD_NOTES («1c-modal-windows»).
+    #
+    # 🔴 ВЕБ-КЛИЕНТ И ТОНКИЙ КЛИЕНТ — РАЗНЫЕ СЛУЧАИ:
+    #   веб-клиент  — окно 1С это DOM; работаем через CDP (порт RC_CDP_PORT), координаты и
+    #                 подписи ТОЧНЫЕ, вердикт клика — «окно исчезло», а не диф картинки;
+    #   тонкий клиент — DOM нет вообще; там только картинка: `modal-click --tmpl <эталон>`
+    #                 (обычный template-match + клик в НАТИВНЫХ пикселях + контрольный кадр).
+    SUB="${1#modal}"; SUB="${SUB#-}"; [ -n "$SUB" ] || SUB="scan"
+    [ "$SUB" = "key" ] && SUB="keys"   # modal-key -> подкоманда keys
+    shift
+    # --tmpl уводит на путь картинки (тонкий клиент): CDP не нужен вовсе
+    if [ "$SUB" = "click" ] && [ "${1:-}" = "--tmpl" ]; then
+      shift; exec bash "$DIR/rc.sh" click-template "${1:?нужен эталон}"
+    fi
+    export CDP_PORT="${RC_CDP_PORT:-${CDP_PORT:-9222}}"
+    export RC_DISPLAY="$DISPLAY_"
+    "$PY" "$LIB/modal1c.py" "$SUB" "$@"
     ;;
 
   verify)
