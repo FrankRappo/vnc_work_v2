@@ -316,6 +316,97 @@ case "${1:-}" in
     fi
     ;;
 
+  scroll)
+    # scroll <x> <y> <up|down> [шагов] — колесо мыши над точкой. Появилось в T301: экраны
+    # приложения длиннее окна, и без прокрутки половина проверяемого просто не попадает в кадр,
+    # а «не видно на кадре» читается как «этого нет». Клавиши PgDn тут не годятся: фокус может
+    # стоять в поле ввода, и страница не поедет.
+    X_="${2:?need x}"; Y_="${3:?need y}"; DIR_="${4:-down}"; N="${5:-3}"
+    BTN=5; [ "$DIR_" = "up" ] && BTN=4
+    OFF="$(_read_offset)"; DX="${OFF%%,*}"; DY="${OFF##*,}"
+    FX=$((X_ + DX)); FY=$((Y_ + DY))
+    if [ "$LIVE" = "1" ]; then
+      X xdotool mousemove "$FX" "$FY" click --repeat "$N" --delay 120 "$BTN" && echo "scrolled $DIR_ x$N at $FX,$FY"
+    else
+      echo "DRY-RUN would scroll $DIR_ x$N at $FX,$FY; set RC_LIVE=1 to execute"
+    fi
+    ;;
+
+  field-left)
+    # field-left <эталон> [ширина_поля] [pad] — ПРОЧИТАТЬ ПОЛЕ ВВОДА СЛЕВА ОТ ЭЛЕМЕНТА-ЯКОРЯ.
+    #
+    # 🔴 ЗАЧЕМ ЭТО В ДРАЙВЕРЕ, А НЕ РАЗОВЫМ СКРИПТОМ В /tmp (урок T301, 24.08.2026).
+    # Задача читала поле пароля приложения: сначала OCR искал подпись кнопки «ПОКАЗАТЬ» в
+    # большой области — и НЕ НАХОДИЛ её, хотя кнопка была на экране. Причина не в кнопке:
+    # tesseract на широкой области с мешаниной текста и psm 3 просто не выделяет короткое слово
+    # мелкими прописными на светлой заливке; на узкой области та же кнопка читается с
+    # уверенностью 96 %. Дальше пошли ручные кропы и подбор порогов — то есть ровно то, против
+    # чего написан §27: одноразовая работа, которую следующая задача сделает заново.
+    #
+    # 🔴 ЛЕЧЕНИЕ — ЯКОРЬ ЭТАЛОНОМ, А НЕ ТЕКСТОМ. Кнопка ищется vmatch'ем (картинкой), а поле
+    # читается по её координатам. Картинке всё равно, какой у окна масштаб и что рядом написано.
+    # Эталоны экрана лежат в templates/loyalty_app/.
+    #
+    # Печатает: строку «якорь: <x,y,w,h>» и прочитанный текст поля.
+    T="${2:?нужен эталон (templates/…png)}"; W="${3:-130}"; PAD="${4:-8}"
+    _shot_to "$SCREENS/_fl.png" || die "capture failed"
+    M=$("$PY" "$LIB/vmatch.py" find --scene "$SCREENS/_fl.png" --template "$T" \
+          --min-score "$MIN_SCORE" --offset "$(_read_offset)" --json)
+    FOUND=$(printf '%s' "$M" | "$PY" -c 'import sys,json;print(json.load(sys.stdin).get("found"))')
+    if [ "$FOUND" != "True" ]; then echo "field-left: якорь не найден ($M)"; exit 2; fi
+    read BX BY BW BH < <(printf '%s' "$M" | "$PY" -c \
+      'import sys,json;d=json.load(sys.stdin);print(d["left"],d["top"],d["w"],d["h"])')
+    echo "якорь: $BX,$BY,$BW,$BH"
+    "$PY" - "$SCREENS/_fl.png" "$BX" "$BY" "$BH" "$W" "$PAD" <<'PYEOF'
+import sys
+from PIL import Image
+scene, bx, by, bh, w, pad = sys.argv[1], *map(int, sys.argv[2:])
+im = Image.open(scene)
+# 🔴 Поле берём ЛЕВЕЕ якоря и чуть выше/ниже его строки: у кнопки и поля общая базовая линия,
+#    но поле выше на пару пикселей — обрезав по высоте кнопки, мы срезаем верх букв.
+box = (max(0, bx - pad - w), max(0, by - pad), max(1, bx - pad), min(im.height, by + bh + pad))
+crop = im.crop(box)
+# Увеличение + порог: мелкий текст поля иначе не читается вовсе (та же причина, что у --scale).
+crop = crop.resize((crop.width * 6, crop.height * 6), Image.LANCZOS).convert('L')
+crop = crop.point(lambda p: 0 if p < 140 else 255)
+crop.save('/tmp/_fl_pole.png')
+PYEOF
+    "$PY" "$LIB/veye.py" text --scene /tmp/_fl_pole.png --scale 1 --psm 7
+    ;;
+
+  rclick)
+    # rclick <x> <y> — ПРАВЫЙ клик. Появился в T301: контекстное меню — второй путь к вставке
+    # (первый, Ctrl+V, ломает нелатинская раскладка), и проверять его надо тем же движением,
+    # каким его делает человек. Драйвер до этого умел только левую кнопку.
+    X_="${2:?need x}"; Y_="${3:?need y}"
+    OFF="$(_read_offset)"; DX="${OFF%%,*}"; DY="${OFF##*,}"
+    FX=$((X_ + DX)); FY=$((Y_ + DY))
+    if [ "$LIVE" = "1" ]; then
+      X xdotool mousemove "$FX" "$FY" click 3 && echo "right-clicked $FX $FY (offset $OFF)"
+    else
+      echo "DRY-RUN would right-click $FX $FY (offset $OFF); set RC_LIVE=1 to execute"
+    fi
+    ;;
+
+  dclick)
+    # dclick <x> <y> [пауза_мс] — ДВОЙНОЙ клик. Появился в T301 (24.08.2026): ярлык на рабочем
+    # столе Windows открывается только двойным нажатием, а `click` умеет одинарный. Обходились
+    # двумя вызовами `click` подряд — и это НЕ то же самое: между отдельными вызовами проходит
+    # больше времени, чем интервал двойного щелчка Windows (по умолчанию 500 мс), и рабочий стол
+    # честно считает их двумя одиночными кликами. Поймано фактом на кассе: ярлык «Лояльность»
+    # дважды «нажали», приложение не открылось ни разу.
+    # 🔴 Тем же нужен и обратный опыт: «двойное нажатие ярлыка» — это проверка замка единственной
+    #    копии (T299/T300), и она обязана нажимать ровно так, как нажимает человек.
+    X_="${2:?need x}"; Y_="${3:?need y}"; MS="${4:-120}"
+    OFF="$(_read_offset)"; DX="${OFF%%,*}"; DY="${OFF##*,}"
+    FX=$((X_ + DX)); FY=$((Y_ + DY))
+    if [ "$LIVE" = "1" ]; then
+      X xdotool mousemove "$FX" "$FY" click --repeat 2 --delay "$MS" 1 && echo "double-clicked $FX $FY (offset $OFF)"
+    else
+      echo "DRY-RUN would double-click $FX $FY (offset $OFF); set RC_LIVE=1 to execute"
+    fi
+    ;;
+
   click-template)
     # flagship: shot -> find -> click -> verify-after -> retry-once. Never clicks
     # below threshold; never proceeds from an unverified state.

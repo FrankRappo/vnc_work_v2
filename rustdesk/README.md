@@ -310,3 +310,9 @@ rustdesk-server пишется на уровне `debug!`, а hbbs крутит�
 пропускает при живой сессии); `27 5` — `rd_health.sh prune 7 500` (логи RustDesk у нас росли на
 0.5–1 ГБ/сут и набрали 2.7 ГБ). На кассе службе `rustdesk` задан restart-on-failure (`sc failure`,
 60/60/120 с) — раньше действий не было.
+
+---
+## См. также: запуск на удалённой Windows БЕЗ GUI (когда RustDesk-вождение не годится)
+Если `schtasks /s` и WMI/DCOM заблокированы файрволом/антивирусом, но SMB(445) жив — команды на машине
+запускаются через `sc.exe \\<ip>` (svcctl по SMB) транзитной службой, без GUI. Рецепт и reverse-SSH
+onboarding: `docs/REMOTE_EXEC_no_gui_sc_over_smb.md` (применено на SOCHI11, туннель VPS:2249, T228).

@@ -14,8 +14,16 @@ if ($Restart) {
 }
 $v = Test-Cdp $Port
 if ($v) { Write-Output "CDP=ALREADY"; Write-Output $v; exit 0 }
-$chrome = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-if (-not (Test-Path $chrome)) { Write-Output "CDP=NOCHROME"; exit 1 }
+# Chrome is NOT always under "Program Files": a 32-bit install (SOCHI11, T229) lands in
+# "Program Files (x86)", a per-user install in %LOCALAPPDATA%. Probing one path made cdp_up.sh
+# report CDP=NOCHROME on a box where Chrome was installed and running.
+$chromeCandidates = @(
+  "C:\Program Files\Google\Chrome\Application\chrome.exe",
+  "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+  "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+)
+$chrome = $chromeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $chrome) { Write-Output "CDP=NOCHROME"; exit 1 }
 $a = @(
   "--headless=new","--disable-gpu","--no-first-run","--no-default-browser-check",
   "--disable-background-networking","--user-data-dir=$ProfileDir",
