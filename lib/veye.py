@@ -59,6 +59,30 @@ def _imread(path, gray=False):
     return img
 
 
+def _channel(img, name):
+    """Взять ОДИН цветовой канал вместо серого — иначе цветной текст на цветной плашке не читается.
+
+    🔴 Поймано фактом 25.08.2026 (T307, киоск КСО): кнопка «Скидочная карта» — БЕЛЫЙ жирный текст
+    на ЖЁЛТОЙ плашке. В сером канале жёлтый почти такой же светлый, как белый, поэтому и OCR,
+    и `--binarize` возвращали по этой полосе ПУСТО — то есть «кнопки нет», хотя она на экране.
+    В СИНЕМ канале жёлтый тёмный (B≈0), а белый светлый (B=255): та же полоса читается целиком
+    («% Скидочная карта», «Пакет -10 ₽»). Пустой OCR на цветной плашке — не доказательство.
+
+    Правило: текст на цветной плашке читать каналом, который у плашки самый ТЁМНЫЙ:
+      жёлтый/оранжевый фон → blue, розовый/красный → green, голубой → red.
+    """
+    if not name or name in ("none", "color"):
+        return img
+    if img.ndim != 3:
+        return img
+    idx = {"b": 0, "blue": 0, "g": 1, "green": 1, "r": 2, "red": 2}.get(name.lower())
+    if idx is None:
+        if name.lower() in ("gray", "grey"):
+            return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        return img
+    return img[:, :, idx]
+
+
 def _ints(s):
     return [int(round(float(x))) for x in s.split(",") if x.strip() != ""]
 
@@ -298,6 +322,7 @@ def cmd_text(a):
         ox = max(0, min(ox, W - 1)); oy = max(0, min(oy, H - 1))
         rw = max(1, min(rw, W - ox)); rh = max(1, min(rh, H - oy))
         sub = img[oy:oy + rh, ox:ox + rw]
+    sub = _channel(sub, getattr(a, "channel", None))
     scale = float(a.scale or 1.0)
     if scale != 1.0:
         sub = cv2.resize(sub, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
@@ -378,6 +403,9 @@ def main(argv=None):
     t.add_argument("--scale", type=float, default=2.0, help="upscale before OCR")
     t.add_argument("--psm", type=int, default=6, help="6 = uniform block, 4 = column, 11 = sparse")
     t.add_argument("--binarize", action="store_true", help="Otsu threshold before OCR")
+    t.add_argument("--channel", default=None,
+                   help="читать ОДИН канал: b|g|r|gray. Белый текст на ЖЁЛТОЙ кнопке виден только "
+                        "в blue (в сером канале жёлтый и белый сливаются — OCR отдаёт пусто, T307)")
     t.add_argument("--json", action="store_true")
 
     a = p.parse_args(argv)

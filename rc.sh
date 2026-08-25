@@ -117,6 +117,8 @@ commands:
   deproject <ox,oy> <scale> <px,py>    map a point read on a crop -> real screen pixel
   ocr <text> [scene]                   optional tesseract text->coord (degrades cleanly)
   read [x,y,w,h] [scale] [psm] [scene] ДОСЛОВНЫЙ текст области кадра (tesseract, rus+eng)
+                                       🔴 текст на ЦВЕТНОЙ плашке: RC_CHANNEL=b|g|r RC_BIN=1
+                                       (белое на ЖЁЛТОМ в сером канале не читается вовсе — T307)
   hover <x> <y> [сек]                  подвести указатель без клика — показать подсказку 1С
   type <строка>                        набрать текст в поле с фокусом (DRY-RUN unless RC_LIVE=1)
   key <клавиши…>                       нажать клавиши: Return, Tab, ctrl+a (DRY-RUN unless RC_LIVE=1)
@@ -246,11 +248,19 @@ case "${1:-}" in
     # 🔴 Это то, чем отчёт цитирует экран, не загружая картинку в контекст дорогого агента (§27).
     # Без региона читается весь кадр; мелкие подписи 1С при scale=1 не читаются вообще, поэтому
     # умолчание scale=2 и psm=6 (сплошной блок). Для разрозненных подписей — psm 11.
+    # 🔴 RC_CHANNEL=b|g|r|gray + RC_BIN=1 — для текста на ЦВЕТНОЙ плашке. Белая надпись на ЖЁЛТОЙ
+    # кнопке киоска («Скидочная карта») в сером канале не читается ВООБЩЕ: жёлтый и белый почти
+    # одинаково светлые, tesseract отдаёт пустоту, и кажется, что кнопки на экране нет (T307,
+    # 25.08.2026). В синем канале жёлтый тёмный — надпись читается целиком. Правило: брать канал,
+    # в котором ФОН самый тёмный (жёлтый→b, розовый→g, голубой→r).
     RG="${2:-}"; SC="${3:-2.0}"; PS="${4:-6}"; _scene "${5:-}"; S="$SCENE"
+    EX=""
+    [ -n "${RC_CHANNEL:-}" ] && EX="$EX --channel ${RC_CHANNEL}"
+    [ "${RC_BIN:-0}" = "1" ] && EX="$EX --binarize"
     if [ -n "$RG" ] && [ "$RG" != "-" ]; then
-      "$PY" "$LIB/veye.py" text --scene "$S" --region "$RG" --scale "$SC" --psm "$PS"
+      "$PY" "$LIB/veye.py" text --scene "$S" --region "$RG" --scale "$SC" --psm "$PS" $EX
     else
-      "$PY" "$LIB/veye.py" text --scene "$S" --scale "$SC" --psm "$PS"
+      "$PY" "$LIB/veye.py" text --scene "$S" --scale "$SC" --psm "$PS" $EX
     fi
     ;;
 
