@@ -55,6 +55,8 @@ rect + (screenX, screenY + (outerHeight - innerHeight)) при devicePixelRatio 
     modal1c.py keys  <Enter|Escape|…>          клавиша в верхнее модальное окно
 """
 import argparse
+import socket
+from urllib.error import URLError
 import importlib.util
 import json
 import os
@@ -599,7 +601,24 @@ def main():
     if not getattr(a, 'f', None):
         p.print_help()
         return 2
-    return a.f(a)
+    # 🔴 БЕЗ CDP — ЧЕСТНЫЙ ОТВЕТ, А НЕ ТРАССИРОВКА. Этот модуль умеет только ВЕБ-клиент 1С: окно
+    # там это DOM, и читается оно через CDP. У ТОНКОГО клиента (RustDesk/AnyDesk на живой кассе)
+    # DOM нет вовсе, порт 9222 никто не слушает, и `modal` до этой правки вываливал двадцать
+    # строк питоновской трассировки ConnectionRefusedError. Вызывающий из этого не мог понять
+    # ни что случилось, ни что делать дальше, и терял время на отладку инструмента вместо задачи
+    # (поймано фактом в T298, 02:24). Теперь тот же случай — одна строка JSON с указанием пути
+    # для тонкого клиента.
+    try:
+        return a.f(a)
+    except (ConnectionRefusedError, socket.error, OSError, URLError) as e:
+        out = {'found': False, 'reason': 'cdp-unreachable',
+               'cdp_port': os.environ.get('CDP_PORT', '9222'),
+               'error': str(e),
+               'hint': 'это ВЕБ-клиентский путь. Тонкий клиент (RustDesk/AnyDesk): '
+                       'rc.sh modal-click --tmpl <эталон>, либо rc.sh read <x,y,w,h> <scale> '
+                       'для текста и rc.sh click по вычисленной точке'}
+        print(json.dumps(out, ensure_ascii=False))
+        return 5
 
 
 if __name__ == '__main__':
