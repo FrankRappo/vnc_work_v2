@@ -96,9 +96,25 @@ _scene_guard(){
 # `die` inside $( ) would only kill the subshell and the caller would sail on with
 # an empty path — the very kind of silent failure this whole change is about.
 SCENE=""
+# 🔴 ЛЕЙБЛ — ТОЖЕ ИМЯ КАДРА (T311, 29.08.2026). `shot <label>` печатает путь, а команды разбора
+# принимали ТОЛЬКО путь: `rc.sh classify t311c` отвечало «нет такого кадра», хотя кадр только что
+# снят и лежит в screens/. Разница между «снять» и «разобрать» в этом месте бессмысленна и стоит
+# лишнего круга у каждого, кто ведёт GUI. Теперь голое имя доразворачивается в screens/<имя>.png
+# (и .jpg), а сообщение об ошибке называет ОБА проверенных пути, чтобы не гадать.
+_expand_scene(){
+  local s="$1"
+  [ -f "$s" ] && { printf '%s' "$s"; return 0; }
+  case "$s" in */*) ;; *)
+    [ -f "$SCREENS/$s.png" ] && { printf '%s' "$SCREENS/$s.png"; return 0; }
+    [ -f "$SCREENS/$s.jpg" ] && { printf '%s' "$SCREENS/$s.jpg"; return 0; }
+  ;; esac
+  printf '%s' "$s"; return 1
+}
 _scene(){
   local s="${1:-}"
-  if [ -n "$s" ]; then [ -f "$s" ] || die "нет такого кадра: $s"; _scene_guard "$s" explicit
+  if [ -n "$s" ]; then
+    local e; e="$(_expand_scene "$s")" || die "нет такого кадра: $s (искал «$s» и «$SCREENS/$s.png»)"
+    s="$e"; _scene_guard "$s" explicit
   else s="$(_last_scene)"; [ -n "$s" ] || die "no scene; run shot first"; _scene_guard "$s" implicit; fi
   SCENE="$s"
 }
