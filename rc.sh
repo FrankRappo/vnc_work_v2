@@ -250,8 +250,13 @@ case "${1:-}" in
     # ocr <text> [scene] [region X,Y,W,H] [scale]
     # 🔴 Region+scale matter: on a full 1920x1080 frame tesseract reads none of the small UI
     # captions, so a "not found" there is not evidence of absence. Crop to the area and scale 3x.
+    # 🔴 T317, 02.09.2026: УМОЛЧАНИЕ МАСШТАБА 1.0 БЫЛО ЛОВУШКОЙ. Ровно то, о чём предупреждает
+    # комментарий выше, случалось на каждом втором вызове: `ocr «Поиск по списку»` отвечал
+    # "not found", хотя надпись на экране есть и `read` её читает. «Не найдено» при scale=1
+    # означает только «мелко», а читается как «этого нет на экране» — и приёмка идёт искать
+    # несуществующую поломку. Умолчание переведено на 2.0 (как у `read`), psm 6 — сплошной блок.
     TX="${2:?need text}"; _scene "${3:-}"; S="$SCENE"
-    RG="${4:-}"; SC="${5:-1.0}"; PSM="${6:-3}"
+    RG="${4:-}"; SC="${5:-${RC_OCR_SCALE:-2.0}}"; PSM="${6:-6}"
     if [ -n "$RG" ]; then
       "$PY" "$LIB/veye.py" ocr --scene "$S" --text "$TX" --region "$RG" --scale "$SC" --psm "$PSM" --json
     else
