@@ -19,15 +19,6 @@
 #   W1C_PUB=/kso/ru/                                      путь публикации базы на IIS
 #   W1C_HTTP=9180  W1C_CDP=9333  W1C_DISPLAY=:99
 #   W1C_USER=ОтрошенкоЛВ                                  ИБ-пользователь
-#   W1C_START=<url>                                       АДРЕС, НА КОТОРОМ ОТКРЫТЬ БРАУЗЕР
-#     По умолчанию — корень публикации. Задают его, когда нужно попасть СРАЗУ на конкретную форму
-#     (`…/e1cib/app/Документ.ЧекККМ.Форма.ФормаДокументаРМК`).
-#     🔴 Зачем отдельной переменной, а не «зайти и перейти по ссылке»: веб-клиент 1С вешает на
-#     страницу `beforeunload`, и переход через `location.href` поднимает НАТИВНОЕ окно браузера
-#     «Leave site?». Пока оно висит, CDP не отвечает вообще — Runtime.evaluate уходит в таймаут, и
-#     сеанс приходится добивать вручную (поймано T375 12.09.2026). Открыть нужный адрес СРАЗУ —
-#     значит не создавать этого окна вовсе. Проверка живости публикации по-прежнему идёт на
-#     W1C_PUB, а не на этот адрес: у формы может быть свой код ответа.
 #   W1C_PASS=…                                            пароль; если пуст — берётся из CREDENTIALS.md
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -37,7 +28,6 @@ HTTP="${W1C_HTTP:-9180}"
 CDP="${W1C_CDP:-9333}"
 DISP="${W1C_DISPLAY:-:99}"
 USER1C="${W1C_USER:-ОтрошенкоЛВ}"
-START="${W1C_START:-}"
 PROFILE="${W1C_PROFILE:-/tmp/w1c_chrome}"
 W="python3 $DIR/w1c.py"
 
@@ -81,11 +71,11 @@ if ! curl -s -m 5 "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1; then
     --remote-debugging-port=$CDP --remote-allow-origins='*' \
     --window-position=0,0 --window-size=1920,1080 --user-data-dir="$PROFILE" \
     --lang=ru-RU --no-first-run --no-default-browser-check --disable-features=Translate \
-    "http://127.0.0.1:$HTTP${START:-$PUB}" >/dev/null 2>&1 &
+    "http://127.0.0.1:$HTTP$PUB" >/dev/null 2>&1 &
   for i in $(seq 1 40); do curl -s -m 3 "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1 && break; sleep 2; done
 fi
 curl -s -m 5 "http://127.0.0.1:$CDP/json/version" >/dev/null 2>&1 || { echo "БРАУЗЕР НЕ ПОДНЯЛСЯ"; exit 1; }
-echo "браузер CDP $CDP поднят на $DISP${START:+ (стартовый адрес: $START)}"
+echo "браузер CDP $CDP поднят на $DISP"
 
 # 3. Дождаться формы входа и войти
 for i in $(seq 1 40); do
@@ -105,12 +95,7 @@ CDP_PORT=$CDP P1C_USER="$USER1C" P1C_PASS="$PASS" timeout 90 $W login
 echo "вход отправлен под «$USER1C»; жду командный интерфейс"
 for i in $(seq 1 40); do
   t=$(CDP_PORT=$CDP timeout 20 $W text 4000 2>/dev/null)
-  case "$t" in
-    *"Начальная страница"*) echo "ИНТЕРФЕЙС ГОТОВ"; exit 0;;
-    # С W1C_START интерфейс открывается СРАЗУ на заказанной форме, и «Начальной страницы» в тексте
-    # может не быть вовсе — ждём тогда любого непустого интерфейса с шапкой приложения.
-    *"1С:Предприятие"*) [ -n "$START" ] && { echo "ИНТЕРФЕЙС ГОТОВ (стартовый адрес)"; exit 0; };;
-  esac
+  case "$t" in *"Начальная страница"*) echo "ИНТЕРФЕЙС ГОТОВ"; exit 0;; esac
   sleep 3
 done
 echo "интерфейс за 2 минуты не появился — сними кадр: CDP_PORT=$CDP $W shot /tmp/w1c.png"

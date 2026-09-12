@@ -6,7 +6,13 @@
 # Пароль кассы запомнен в клиенте (галка "Remember") → обычно коннект без запроса пароля.
 # Если всё же спросит пароль: bash x99.sh type '<пароль из /work/kso/chat/rustdesk_kassa.md>'; bash x99.sh key Return
 set -u
-DISP=:99; RT=/tmp/xrt99; PORT=5902
+# 🔴 Дисплей и порт ПЕРЕОПРЕДЕЛЯЮТСЯ окружением (12.09.2026, по образцу x99.sh):
+#   RD_DISPLAY=:97 RD_PORT=5903 bash connect.sh <ID>
+# Зачем: `:99` бывает занят живой работой. 12.09 ночная задача T378 держала на нём веб-клиент 1С,
+# и запуск этого скрипта с жёстко зашитым `:99` перезапустил бы Xvfb и убил её сессию посреди
+# правки ДЕНЕЖНОГО тракта (та же грабля, что описана в workflow §25 про AnyDesk на :99).
+# Умолчания прежние — без переменных поведение байт в байт как раньше.
+DISP="${RD_DISPLAY:-:99}"; PORT="${RD_PORT:-5902}"; RT="/tmp/xrt${DISP#:}"
 TARGET_ID=${1:-243540605}
 # runuser lives in /sbin, which sudo's secure_path strips -> resolve an absolute path once
 # (bare `runuser` fails with "command not found" under sudo). Fallback keeps old behaviour.
