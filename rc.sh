@@ -40,11 +40,22 @@ die(){ log "rc: $*"; exit 3; }
 
 # xdotool/scrot on the right display. Root -> runuser as the display owner;
 # non-root -> direct (the agent runs as the owner). No hardcode beyond env.
+# 🔴 LC_ALL/LANG=C.UTF-8 (T382, 15.09.2026): `env -i` strips the locale entirely,
+# and `xdotool type`/`--file` with a Cyrillic argument then dies outright —
+# "Invalid multi-byte sequence encountered" / "xdo_enter_text_window reported an
+# error" — ABORTING mid-string (Latin typed so far stays, everything after the
+# first Cyrillic char is silently never sent, no error surfaced to the caller
+# beyond stderr). Found live on DESKTOP-6NTV2D5: `Ab9 Zz0 ЩФЫ…` stopped dead at
+# `Ab9 Zz0 `. The locale fix stops the CRASH, but does not make Cyrillic type —
+# see FIELD_NOTES.md "Канал ввода": plain char-by-char typing (rc.sh type/
+# typefile/key) cannot send Cyrillic through this channel AT ALL, crash or not,
+# because the local Xvfb keymap has no Cyrillic keysyms to remap onto. Use
+# clip_paste.sh (Ctrl+V) or rclick+«Вставить» for anything with Cyrillic.
 X(){
   if [ "$(id -u)" = "0" ]; then
-    runuser -u "$USER_" -- env -i HOME="/home/$USER_" PATH=/usr/local/bin:/usr/bin:/bin DISPLAY="$DISPLAY_" "$@"
+    runuser -u "$USER_" -- env -i HOME="/home/$USER_" PATH=/usr/local/bin:/usr/bin:/bin LC_ALL=C.UTF-8 LANG=C.UTF-8 DISPLAY="$DISPLAY_" "$@"
   else
-    env DISPLAY="$DISPLAY_" "$@"
+    env LC_ALL=C.UTF-8 LANG=C.UTF-8 DISPLAY="$DISPLAY_" "$@"
   fi
 }
 
