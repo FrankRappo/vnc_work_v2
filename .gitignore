@@ -31,6 +31,11 @@ srvshot/
 # профили браузера с ЖИВОЙ залогиненной сессией — данные, не код
 profile_backups/*/
 
+# Windows-native Edge/CDP runtime state (profiles, cookies and DPAPI data)
+windows/native-edge-cdp/**/profile/
+windows/native-edge-cdp/**/*.dpapi
+windows/native-edge-cdp/**/results/
+
 # Временные кропы и кадры задач (12.09.2026): мусор по 0,4 МБ, в git им не место —
 # кадры живут в evidence/ и screens/, а эти оседали в корне после прогонов T317/T318/T320.
 t[0-9][0-9][0-9]_*.png

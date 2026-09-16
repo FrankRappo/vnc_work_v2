@@ -180,3 +180,11 @@ env: RC_CDP_PORT — порт отладки браузера с веб-клие
 
 Подробный разбор и признаки опознания окон — `FIELD_NOTES.md`, раздел `1c-modal-windows`.
 Эталоны — `templates/`.
+
+## Native Edge/CDP on Windows
+
+For browser-only work on Windows, use the isolated raw-CDP driver in
+[`windows/native-edge-cdp/`](windows/native-edge-cdp/README.md). It does not
+require WSL, Xvfb, VNC, Selenium, or an extra Python package. Its smoke suite
+uses a separate debugging port and disposable profile so it cannot stop or
+overwrite an authenticated browser profile.
