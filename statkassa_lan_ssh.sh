@@ -14,7 +14,7 @@ set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 IP="${STATKASSA_LAN_IP:-192.168.0.187}"
 LPORT="${STATKASSA_LAN_PORT:-12250}"
-VPS=178.253.55.128
+VPS=217.144.184.51
 up() {
   ss -tln 2>/dev/null | grep -q "127.0.0.1:$LPORT " && return 0
   setsid nohup ssh -i "$DIR/ssh_channel/kso3_me" -p 2247 \
