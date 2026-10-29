@@ -1,7 +1,7 @@
 #!/bin/bash
 # srv_scp.sh <src> <dst> — copy files to/from machine 239677631 (desktop-vgvheou, 1C-server-admin box)
 # over the reverse-SSH tunnel (port 2244). Use the alias  srv:  for the machine side; it expands
-# to  Админ@178.253.55.128: .
+# to  Админ@217.144.184.51: .
 #
 #   bash srv_scp.sh ./file            srv:C:/tmp/file      # /work -> machine
 #   bash srv_scp.sh srv:C:/tmp/out    ./out                # machine -> /work
@@ -13,7 +13,7 @@
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SRVUSER='Админ'
-VPS=178.253.55.128
+VPS="${KSO_VPS_HOST:-217.144.184.51}"
 PORT=2244
 # NB: login is a Cyrillic account ('Админ'). scp rejects non-ASCII in user@host ("invalid user
 # name"), so the user is passed via -o User= and the  srv:  alias expands to just the VPS host.

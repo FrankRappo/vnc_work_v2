@@ -3,7 +3,7 @@
 # (192.168.0.10, RustDesk 239677631) *через джамп* SERVER-1S, когда её собственный
 # обратный туннель (VPS:2244) лежит.
 #
-# Path:  /work --ssh--> VPS 178.253.55.128:2248 --(reverse)--> SERVER-1S sshd
+# Path:  /work --ssh--> VPS 217.144.184.51:2248 --(reverse)--> SERVER-1S sshd
 #              --(direct-tcpip -W)--> 192.168.0.10:22 (DESKTOP-VGVHEOU sshd)
 #        login = Админ, ключ ssh_channel/srv_me (тот же, что у srv_ssh.sh).
 #
@@ -21,7 +21,7 @@ set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 OLDHOST=192.168.0.10
 OLDUSER='Админ'
-JUMPVPS=178.253.55.128
+JUMPVPS="${KSO_VPS_HOST:-217.144.184.51}"
 JUMPPORT=2248
 JUMPUSER='User'
 

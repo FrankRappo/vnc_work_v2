@@ -14,7 +14,7 @@ set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 OLDHOST=192.168.0.10
 OLDUSER='Админ'
-JUMPVPS=178.253.55.128
+JUMPVPS="${KSO_VPS_HOST:-217.144.184.51}"
 JUMPPORT=2248
 JUMPUSER='User'
 

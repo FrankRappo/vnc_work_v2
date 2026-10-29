@@ -1,7 +1,7 @@
 #!/bin/bash
 # ofd_scp.sh <src> <dst> — copy files to/from the OFD / Chestny-Znak machine (RustDesk 474932946,
 # hostname desktop-i7oe05b) over the reverse-SSH tunnel (port 2245). Use the alias  ofd:  for the
-# machine side; it expands to  User@178.253.55.128:  (User passed via -o User=, target = VPS host).
+# machine side; it expands to  User@217.144.184.51:  (User passed via -o User=, target = VPS host).
 #
 #   bash ofd_scp.sh ./file            ofd:C:/tmp/file      # /work -> machine
 #   bash ofd_scp.sh ofd:C:/tmp/out    ./out                # machine -> /work
@@ -13,7 +13,7 @@
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 OFDUSER='User'
-VPS=178.253.55.128
+VPS="${KSO_VPS_HOST:-217.144.184.51}"
 PORT=2245
 args=("$@")
 for i in "${!args[@]}"; do

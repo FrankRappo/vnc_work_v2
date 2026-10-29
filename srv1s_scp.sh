@@ -7,13 +7,14 @@
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SRVUSER='User'
-VPS=178.253.55.128
+VPS=217.144.184.51
 PORT=2248
 OPTS=(-i "$DIR/ssh_channel/srv1s_me" -P "$PORT"
       -o User="$SRVUSER"
       -o UserKnownHostsFile="$DIR/ssh_channel/known_hosts_srv1s"
       -o StrictHostKeyChecking=accept-new
-      -o ConnectTimeout=25 -o BatchMode=yes)
+      -o TCPKeepAlive=yes -o ConnectionAttempts=4
+      -o ConnectTimeout=20 -o BatchMode=yes)
 if [ "${1:-}" = "--from" ]; then
   exec scp "${OPTS[@]}" "$VPS:$2" "$3"
 else

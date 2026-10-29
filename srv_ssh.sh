@@ -2,7 +2,7 @@
 # srv_ssh.sh [ssh opts] "<remote command>" — run a command on machine 239677631
 # (desktop-vgvheou, the 1C-server-admin box) over the reverse-SSH tunnel.
 #
-# Path:  /work  --ssh-->  jump VPS 178.253.55.128 : 2244  --(reverse tunnel)-->  machine sshd :22
+# Path:  /work  --ssh-->  jump VPS 217.144.184.51 : 2244  --(reverse tunnel)-->  machine sshd :22
 #        login = Админ (Windows admin) authenticated by key ssh_channel/srv_me.
 # The machine (behind NAT) initiates the tunnel outbound; the SRVTunnel scheduled task
 # (SYSTEM, at boot+logon) keeps it alive. See chat/report_ZSSH-SRV.md for the full setup.
@@ -16,7 +16,7 @@
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 SRVUSER='Админ'
-VPS=178.253.55.128
+VPS="${KSO_VPS_HOST:-217.144.184.51}"
 PORT=2244
 # NB: login is a Cyrillic account ('Админ') — scp/ssh reject non-ASCII in the user@host form
 # ("invalid user name"), so the user is passed via -o User= and the target is just the VPS host.

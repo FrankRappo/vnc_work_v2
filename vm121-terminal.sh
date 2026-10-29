@@ -6,7 +6,7 @@ set -euo pipefail
 
 ACCESS_FILE="${ACCESS_FILE:-/work/claster/llm-gpu-storage-cluster-20260527/private/access.md}"
 JUMP_KEY="${JUMP_KEY:-/root/.ssh/ke_tunnel}"
-JUMP_HOST="${JUMP_HOST:-178.253.55.128}"
+JUMP_HOST="${JUMP_HOST:-217.144.184.51}"
 SRV1_HOST="${SRV1_HOST:-134.0.107.8}"
 SRV1_PORT="${SRV1_PORT:-234}"
 VM121_HOST="${VM121_HOST:-192.168.87.33}"

@@ -15,7 +15,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 CASHLAN=192.168.0.186
 CASHUSER=sco_m210
 SRVUSER='Админ'
-VPS=178.253.55.128
+VPS="${KSO_VPS_HOST:-217.144.184.51}"
 SRVPORT=2244
 PROXY="ssh -i $DIR/ssh_channel/srv_me -o User=$SRVUSER -p $SRVPORT \
   -o UserKnownHostsFile=$DIR/ssh_channel/known_hosts_srv -o StrictHostKeyChecking=accept-new \

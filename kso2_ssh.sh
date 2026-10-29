@@ -2,7 +2,7 @@
 # kso2_ssh.sh [ssh opts] "<remote command>" — run a command on KSO #2 (the second self-checkout,
 # RustDesk 288860502, hostname desktop-89hr2jf, Windows user M210) over the reverse-SSH tunnel.
 #
-# Path:  /work  --ssh-->  jump VPS 178.253.55.128 : 2246  --(reverse tunnel)-->  machine sshd :22
+# Path:  /work  --ssh-->  jump VPS 217.144.184.51 : 2246  --(reverse tunnel)-->  machine sshd :22
 #        login = M210 (Windows admin) authenticated by key ssh_channel/kso2_me.
 # The machine (behind NAT) initiates the tunnel outbound; the KSO2Tunnel scheduled task
 # (SYSTEM, at boot+logon) keeps it alive. See orch/live/reports/report_T117_kso2_ssh_tunnel.md.
@@ -16,7 +16,7 @@
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 KSO2USER='M210'
-VPS=178.253.55.128
+VPS="${KSO_VPS_HOST:-217.144.184.51}"
 PORT=2246
 # login is the interactive Windows admin account 'M210'; passed via -o User= (target = VPS host only),
 # same form as srv_ssh.sh / ofd_ssh.sh so a rename later needs no edit here.

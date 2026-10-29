@@ -1,7 +1,7 @@
 #!/bin/bash
 # kso2_scp.sh <src> <dst> — copy files to/from KSO #2 (the second self-checkout, RustDesk 288860502,
 # hostname desktop-89hr2jf) over the reverse-SSH tunnel (port 2246). Use the alias  kso2:  for the
-# machine side; it expands to  M210@178.253.55.128:  (M210 passed via -o User=, target = VPS host).
+# machine side; it expands to  M210@217.144.184.51:  (M210 passed via -o User=, target = VPS host).
 #
 #   bash kso2_scp.sh ./file             kso2:C:/tmp/file     # /work -> machine
 #   bash kso2_scp.sh kso2:C:/tmp/out    ./out                # machine -> /work
@@ -13,7 +13,7 @@
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
 KSO2USER='M210'
-VPS=178.253.55.128
+VPS="${KSO_VPS_HOST:-217.144.184.51}"
 PORT=2246
 args=("$@")
 for i in "${!args[@]}"; do

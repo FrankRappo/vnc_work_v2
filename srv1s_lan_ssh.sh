@@ -10,17 +10,17 @@
 # Обход: идём в магазинную ЛОКАЛЬНУЮ СЕТЬ через КСО №3 (VPS:2247) и оттуда прыгаем на sshd
 # SERVER-1S по локальному адресу. Тот же ключ `ssh_channel/srv1s_me` проходит с первого раза.
 #
-# 🔴 IP SERVER-1S = 192.168.0.142 (в CREDENTIALS.md записан УСТАРЕВШИЙ 192.168.0.149 — с него
-#    машина не отвечает ни с кассы, ни с КСО №3). Имя резолвится: [Net.Dns]::GetHostAddresses('SERVER-1S').
+# 🔴 IP SERVER-1S — DHCP и уже менялся. Текущий известный адрес — 192.168.0.10.
+#    Его можно явно переопределить через SRV1S_LAN_IP; IP из старой документации не использовать.
 #
 # 🔴 Запускать с dangerouslyDisableSandbox.
 #
 #   bash srv1s_lan_ssh.sh 'hostname && whoami'
 set -u
 DIR="$(cd "$(dirname "$0")" && pwd)"
-SRV_IP="${SRV1S_LAN_IP:-192.168.0.142}"
+SRV_IP="${SRV1S_LAN_IP:-192.168.0.10}"
 LPORT="${SRV1S_LAN_PORT:-12248}"
-VPS=178.253.55.128
+VPS="${KSO_VPS_HOST:-217.144.184.51}"
 
 up() {
   ss -tln 2>/dev/null | grep -q "127.0.0.1:$LPORT " && return 0
